@@ -11,13 +11,13 @@ try:
 except ImportError:
     rarfile = None
 from bs4 import BeautifulSoup
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 import webbrowser
 from io import BytesIO
 import sys
 
 # ─── Configuración Global ────────────────────────────────────────────────────
-CURRENT_VERSION = "1.4.1"
+CURRENT_VERSION = "1.4.2"
 APP_NAME = "Chvstx Nexus"
 REPO_URL = "https://github.com/DavidFR-2000/ChvstxNexux"
 UPDATE_URL = "https://api.github.com/repos/DavidFR-2000/ChvstxNexux/releases/latest"
@@ -306,7 +306,7 @@ def download_cover(game_name, cache_dir, platform_id=None, console_name=""):
                         img_r = requests.get(img_url, headers=headers, timeout=8)
                         if img_r.status_code == 200:
                             img = Image.open(BytesIO(img_r.content)).convert("RGB")
-                            img = img.resize((300, 200), Image.LANCZOS)
+                            img = ImageOps.pad(img, (300, 200), color="#0a0a0f")
                             img.save(cover_path, "JPEG")
                             return cover_path
                     except Exception:
@@ -330,7 +330,7 @@ def download_cover(game_name, cache_dir, platform_id=None, console_name=""):
                     img_r = requests.get(img_url, headers=headers, timeout=6)
                     if img_r.status_code == 200 and len(img_r.content) > 5000:
                         img = Image.open(BytesIO(img_r.content)).convert("RGB")
-                        img = img.resize((300, 200), Image.LANCZOS)
+                        img = ImageOps.pad(img, (300, 200), color="#0a0a0f")
                         img.save(cover_path, "JPEG")
                         return cover_path
                 except Exception:
@@ -976,7 +976,7 @@ class ChvstxNexus(ctk.CTk):
         cache_dir  = self.config.get("covers_cache","")
         cover_path = get_cover_path(cache_dir, name)
         try:
-            img = Image.open(cover_path).resize((260,180), Image.LANCZOS) if os.path.exists(cover_path) \
+            img = ImageOps.pad(Image.open(cover_path), (260,180), color="#0a0a0f") if os.path.exists(cover_path) \
                   else make_placeholder(name, info["color"], (260,180))
         except:
             img = make_placeholder(name, info["color"], (260,180))
@@ -1085,6 +1085,24 @@ class ChvstxNexus(ctk.CTk):
                       border_width=1, border_color=COLORS["yellow"],
                       text_color=COLORS["yellow"],
                       command=lambda: self._open_achievements(game_file, console_name)
+        ).pack(fill="x", pady=(6,0))
+
+        def reload_cover():
+            if os.path.exists(cover_path):
+                try: os.remove(cover_path)
+                except: pass
+            win.destroy()
+            self._load_covers_for_list([game_file], [console_name])
+            if self.current_view == "library" and self.current_console == console_name:
+                self._load_games()
+            elif self.current_view == "favorites":
+                self._show_favorites()
+
+        ctk.CTkButton(right, text="🖼️  Recargar Carátula",
+                      font=("Courier New",11),
+                      fg_color="transparent", hover_color=COLORS["bg_hover"],
+                      border_width=1, border_color=COLORS["border"],
+                      text_color=COLORS["text_dim"], command=reload_cover
         ).pack(fill="x", pady=(6,0))
 
     # ════════ RetroAchievements ══════════════════════════════════════════
@@ -1370,7 +1388,7 @@ class ChvstxNexus(ctk.CTk):
                 result = cover_path
             if result and os.path.exists(result):
                 try:
-                    img = Image.open(result).resize((260,150), Image.LANCZOS)
+                    img = ImageOps.pad(Image.open(result), (260,150), color="#0a0a0f")
                     self.after(0, lambda gf=game_file, i=img: self._update_cover(gf, i))
                 except:
                     pass
