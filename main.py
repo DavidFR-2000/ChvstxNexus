@@ -17,7 +17,7 @@ from io import BytesIO
 import sys
 
 # ─── Configuración Global ────────────────────────────────────────────────────
-CURRENT_VERSION = "1.2.0"
+CURRENT_VERSION = "1.0.0"
 APP_NAME = "Chvstx Nexus"
 REPO_URL = "https://github.com/DavidFR-2000/ChvstxNexux"
 UPDATE_URL = "https://api.github.com/repos/DavidFR-2000/ChvstxNexux/releases/latest"
@@ -32,8 +32,8 @@ if IS_PORTABLE:
 else:
     CONFIG_DIR = os.path.expanduser("~")
 
-CONFIG_FILE   = os.path.join(CONFIG_DIR, ".retrolauncher_config.json")
-PLAYTIME_FILE = os.path.join(CONFIG_DIR, ".retrolauncher_playtime.json")
+CONFIG_FILE   = os.path.join(CONFIG_DIR, ".chvstxnexus_config.json")
+PLAYTIME_FILE = os.path.join(CONFIG_DIR, ".chvstxnexus_playtime.json")
 
 # ─── Apariencia ──────────────────────────────────────────────────────────────
 ctk.set_appearance_mode("dark")
@@ -169,7 +169,7 @@ def load_config():
         "roms_dir":       os.path.join(os.path.expanduser("~"), "ROMs"),
         "retroarch_path": r"C:\RetroArch-Win64\retroarch.exe",
         "cores_dir":      r"C:\RetroArch-Win64\cores",
-        "covers_cache":   os.path.join(os.path.expanduser("~"), ".retrolauncher_covers"),
+        "covers_cache":   os.path.join(os.path.expanduser("~"), ".chvstxnexus_covers"),
         "favorites":      [],
         "ra_user":        "",
         "ra_apikey":      "",
@@ -215,6 +215,26 @@ def save_playtime(data):
 def sanitize_name(name):
     return "".join(c for c in name if c.isalnum() or c in " _-").strip()
 
+def _create_desktop_shortcut(target_exe):
+    """Crea un acceso directo en el escritorio usando PowerShell."""
+    try:
+        desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+        shortcut_path = os.path.join(desktop, f"{APP_NAME}.lnk")
+        icon_path = target_exe # Opcional: si el exe tiene icono
+        
+        ps_script = f"""
+        $WshShell = New-Object -ComObject WScript.Shell
+        $Shortcut = $WshShell.CreateShortcut("{shortcut_path}")
+        $Shortcut.TargetPath = "{target_exe}"
+        $Shortcut.WorkingDirectory = "{os.path.dirname(target_exe)}"
+        $Shortcut.Save()
+        """
+        subprocess.run(["powershell", "-Command", ps_script], capture_output=True, check=True)
+        return True
+    except Exception as e:
+        print(f"Error creando acceso directo: {e}")
+        return False
+
 def get_cover_path(cache_dir, game_name):
     return os.path.join(cache_dir, f"{sanitize_name(game_name)}.jpg")
 
@@ -252,7 +272,13 @@ def download_cover(game_name, cache_dir, platform_id=None):
         r = requests.get(f"https://www.bing.com/images/search?q={q}&first=1",
                          headers=headers, timeout=7)
         if r.status_code == 200:
-            for img_url in re.findall(r'"murl":"(https?://[^"]+\.(?:jpg|jpeg|png))"', r.text)[:5]:
+            # Buscamos murl en los datos de imagen, manejando escape de comillas
+            matches = re.findall(r'"murl":"(https?://[^"]+\.(?:jpg|jpeg|png))"', r.text)
+            if not matches:
+                # Intento 2 con comillas escapadas comunes en HTML
+                matches = re.findall(r'&quot;murl&quot;:&quot;(https?://[^&]+\.(?:jpg|jpeg|png))&quot;', r.text)
+            
+            for img_url in matches[:10]:
                 try:
                     img_r = requests.get(img_url, headers=headers, timeout=6)
                     if img_r.status_code == 200 and len(img_r.content) > 5000:
@@ -318,7 +344,7 @@ def make_placeholder(game_name, color, size=(300, 200)):
     return img
 
 # ─── Aplicación ──────────────────────────────────────────────────────────────
-class RetroLauncher(ctk.CTk):
+class ChvstxNexus(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.config          = load_config()
@@ -344,7 +370,8 @@ class RetroLauncher(ctk.CTk):
 
         # Si es la primera vez (o primera vez en Nexus), mostrar el asistente
         if check_branding_migration(self.config):
-            self.after(500, self._show_welcome_wizard)
+            self.withdraw()  # Ocultar ventana principal
+            self.after(200, self._show_welcome_wizard)
         
         # Buscar actualizaciones en segundo plano
         threading.Thread(target=self._check_for_updates, daemon=True).start()
@@ -1704,162 +1731,179 @@ class RetroLauncher(ctk.CTk):
 
     def _show_welcome_wizard(self):
         win = ctk.CTkToplevel(self)
-        win.title(f"👋 Bienvenido a {APP_NAME}")
-        win.geometry("680x620")
+        win.title(f"📦 Bienvenido a {APP_NAME}")
+        win.geometry("750x720")
         win.configure(fg_color=COLORS["bg_dark"])
         win.attributes("-topmost", True)
         win.grab_set()
 
-        content_f = ctk.CTkFrame(win, fg_color="transparent")
-        content_f.pack(fill="both", expand=True)
+        self.setup_step = 0
+        self.install_mode = "standard"
 
-        def clear_content():
-            for w in content_f.winfo_children(): w.destroy()
+        def on_close():
+            if self.setup_step < 5:
+                if messagebox.askyesno("Salir", "¿Deseas salir del asistente? Se mostrará la app pero sin configurar.", parent=win):
+                    self.deiconify()
+                    win.destroy()
+            else:
+                self.deiconify()
+                win.destroy()
 
-        def show_install_mode():
-            clear_content()
-            header = ctk.CTkFrame(content_f, fg_color=COLORS["bg_mid"], height=100, corner_radius=0)
-            header.pack(fill="x", side="top")
-            ctk.CTkLabel(header, text="📦 ELIGE TU MODO DE USO", 
-                         font=("Courier New", 22, "bold"), text_color=COLORS["accent"]).pack(pady=25)
+        win.protocol("WM_DELETE_WINDOW", on_close)
 
-            main = ctk.CTkFrame(content_f, fg_color="transparent")
-            main.pack(fill="both", expand=True, padx=40, pady=30)
+        main_container = ctk.CTkFrame(win, fg_color="transparent")
+        main_container.pack(fill="both", expand=True)
 
-            ctk.CTkLabel(main, text=f"¿Cómo quieres usar {APP_NAME}?", 
-                         font=("Courier New", 14, "bold"), text_color=COLORS["text_bright"]).pack(pady=(0, 20))
+        def clear_container():
+            for w in main_container.winfo_children(): w.destroy()
 
-            # Standard Mode
-            std_f = ctk.CTkFrame(main, fg_color=COLORS["bg_card"], corner_radius=12, border_width=1, border_color=COLORS["border"])
-            std_f.pack(fill="x", pady=10)
-            ctk.CTkLabel(std_f, text="🏠 Instalación Estándar (Recomendado)", font=("Courier New", 13, "bold"), text_color=COLORS["green"]).pack(anchor="w", padx=20, pady=(15, 5))
-            ctk.CTkLabel(std_f, text="La configuración se guarda en tu perfil de usuario.\nIdeal si usas el programa siempre en este PC.", font=("Courier New", 11), text_color=COLORS["text_dim"], justify="left").pack(anchor="w", padx=20, pady=(0, 15))
-            ctk.CTkButton(std_f, text="Seleccionar Estándar", width=180, height=36, fg_color=COLORS["bg_hover"], hover_color=COLORS["bg_mid"], border_width=1, border_color=COLORS["border"], command=show_intro).pack(side="right", padx=20, pady=(0, 15))
+        def next_step():
+            self.setup_step += 1
+            show_step()
 
-            # Portable Mode
-            port_f = ctk.CTkFrame(main, fg_color=COLORS["bg_card"], corner_radius=12, border_width=1, border_color=COLORS["border"])
-            port_f.pack(fill="x", pady=10)
-            ctk.CTkLabel(port_f, text="💾 Modo Portable", font=("Courier New", 13, "bold"), text_color=COLORS["yellow"]).pack(anchor="w", padx=20, pady=(15, 5))
-            ctk.CTkLabel(port_f, text="Todo se guarda en la carpeta del programa.\nPerfecto para llevarlo en un USB o disco externo.", font=("Courier New", 11), text_color=COLORS["text_dim"], justify="left").pack(anchor="w", padx=20, pady=(0, 15))
-            
-            def set_portable():
+        def show_step():
+            clear_container()
+            if self.setup_step == 0: step_intro()
+            elif self.setup_step == 1: step_install_type()
+            elif self.setup_step == 2: step_folders()
+            elif self.setup_step == 3: step_retroarch()
+            elif self.setup_step == 4: step_achievements()
+            elif self.setup_step == 5: step_finish()
+
+        def step_intro():
+            header = ctk.CTkFrame(main_container, fg_color=COLORS["bg_mid"], height=120, corner_radius=0)
+            header.pack(fill="x")
+            ctk.CTkLabel(header, text=f"✨ BIENVENIDO A {APP_NAME.upper()}", 
+                         font=("Courier New", 26, "bold"), text_color=COLORS["accent"]).pack(pady=40)
+            body = ctk.CTkFrame(main_container, fg_color="transparent")
+            body.pack(fill="both", expand=True, padx=50, pady=30)
+            ctk.CTkLabel(body, text="Tu centro de emulación premium.\nConfiguraremos todo para que empieces a jugar en segundos.",
+                         font=("Courier New", 14), text_color=COLORS["text_bright"], justify="center").pack(pady=20)
+            for icon, desc in [("🎨 Interfaz Moderna", "Diseño KH premium."), ("🌐 Descargas Directas", "ROMs al instante."), 
+                               ("🏆 Logros Integrados", "Soporte RetroAchievements."), ("⚙️ Auto-Setup", "Instalamos RetroArch por ti.")]:
+                f = ctk.CTkFrame(body, fg_color=COLORS["bg_card"], corner_radius=10, height=50)
+                f.pack(fill="x", pady=5)
+                ctk.CTkLabel(f, text=icon, font=("Courier New", 12, "bold"), text_color=COLORS["yellow"], width=180).pack(side="left", padx=15)
+                ctk.CTkLabel(f, text=desc, font=("Courier New", 11), text_color=COLORS["text_dim"]).pack(side="left")
+            ctk.CTkButton(main_container, text="Comenzar →", fg_color=COLORS["accent"], text_color=COLORS["bg_dark"], font=("Courier New", 14, "bold"), height=45, width=200, command=next_step).pack(pady=30)
+
+        def step_install_type():
+            ctk.CTkLabel(main_container, text="💾 Instalación de Nexus", font=("Courier New", 18, "bold"), text_color=COLORS["accent"]).pack(pady=(40, 10))
+            ctk.CTkLabel(main_container, text="Elige cómo quieres configurar el programa.", font=("Courier New", 11), text_color=COLORS["text_dim"]).pack(pady=(0, 30))
+            cards = ctk.CTkFrame(main_container, fg_color="transparent")
+            cards.pack(fill="x", padx=40)
+            std = ctk.CTkFrame(cards, fg_color=COLORS["bg_card"], corner_radius=12, border_width=1, border_color=COLORS["border"])
+            std.pack(fill="x", pady=10)
+            ctk.CTkLabel(std, text="🏠 Instalación Estándar", font=("Courier New", 13, "bold"), text_color=COLORS["green"]).pack(anchor="w", padx=20, pady=(15, 5))
+            ctk.CTkLabel(std, text="Copia el programa a tu PC y crea un acceso directo en el escritorio.", font=("Courier New", 10), text_color=COLORS["text_dim"]).pack(anchor="w", padx=20, pady=(0, 15))
+            def_path = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ChvstxNexus")
+            path_var = tk.StringVar(value=def_path)
+            row = ctk.CTkFrame(std, fg_color="transparent"); row.pack(fill="x", padx=20, pady=(0, 15))
+            ctk.CTkEntry(row, textvariable=path_var, font=("Courier New", 10), height=30).pack(side="left", fill="x", expand=True, padx=(0, 10))
+            ctk.CTkButton(row, text="...", width=40, command=lambda: path_var.set(filedialog.askdirectory() or path_var.get())).pack(side="right")
+            def do_std():
+                try:
+                    target = path_var.get(); os.makedirs(target, exist_ok=True)
+                    current_exe = sys.executable if getattr(sys, 'frozen', False) else None
+                    if current_exe:
+                        dest_exe = os.path.join(target, os.path.basename(current_exe))
+                        if os.path.abspath(current_exe) != os.path.abspath(dest_exe): shutil.copy2(current_exe, dest_exe)
+                        _create_desktop_shortcut(dest_exe)
+                    self.config["first_run"] = False # Marcar como instalado
+                    save_config(self.config)
+                    next_step()
+                except Exception as e: messagebox.showerror("Error", f"Error: {e}")
+            ctk.CTkButton(std, text="Instalar y Continuar", fg_color=COLORS["accent"], text_color=COLORS["bg_dark"], font=("Courier New", 11, "bold"), command=do_std).pack(pady=(0, 15))
+            port = ctk.CTkFrame(cards, fg_color=COLORS["bg_card"], corner_radius=12, border_width=1, border_color=COLORS["border"])
+            port.pack(fill="x", pady=10)
+            ctk.CTkLabel(port, text="💾 Modo Portable", font=("Courier New", 13, "bold"), text_color=COLORS["yellow"]).pack(anchor="w", padx=20, pady=(15, 5))
+            def do_port():
                 try:
                     with open(PORTABLE_FILE, "w") as f: f.write("1")
-                    # Intentar copiar config si ya existe en perfil de usuario
-                    old_conf = os.path.join(os.path.expanduser("~"), ".retrolauncher_config.json")
-                    if os.path.exists(old_conf) and old_conf != CONFIG_FILE:
-                        import shutil
-                        try:
-                            shutil.copy2(old_conf, CONFIG_FILE)
-                        except: pass
-                    messagebox.showinfo("Modo Portable", f"Se ha activado el modo portable. {APP_NAME} ahora guardará todo en su propia carpeta.\n\nLa aplicación se reiniciará para aplicar los cambios.")
-                    # Reiniciar app para que CONFIG_DIR cambie
-                    python = sys.executable
-                    os.execl(python, python, *sys.argv)
-                except Exception as e:
-                    messagebox.showerror("Error", f"No se pudo crear el archivo portable_mode.txt: {e}")
+                    messagebox.showinfo(APP_NAME, "Modo portable activado. Reinciciando...")
+                    subprocess.Popen([sys.executable] + (sys.argv[1:] if getattr(sys, 'frozen', False) else [__file__] + sys.argv[1:]))
+                    sys.exit()
+                except Exception as e: messagebox.showerror("Error", f"Error: {e}")
+            ctk.CTkButton(port, text="Usar Portable", font=("Courier New", 11), command=do_port).pack(pady=(0, 15))
 
-            ctk.CTkButton(port_f, text="Seleccionar Portable", width=180, height=36, fg_color=COLORS["bg_hover"], hover_color=COLORS["bg_mid"], border_width=1, border_color=COLORS["border"], command=set_portable).pack(side="right", padx=20, pady=(0, 15))
+        def step_folders():
+            ctk.CTkLabel(main_container, text="📁 Tus Carpetas", font=("Courier New", 18, "bold"), text_color=COLORS["accent"]).pack(pady=(40, 10))
+            f = ctk.CTkFrame(main_container, fg_color=COLORS["bg_card"], corner_radius=12)
+            f.pack(fill="x", padx=40, pady=25)
+            rom_v = tk.StringVar(value=self.config.get("roms_dir", ""))
+            ctk.CTkLabel(f, text="¿Dónde guardas tus ROMs?", font=("Courier New", 12, "bold")).pack(anchor="w")
+            r = ctk.CTkFrame(f, fg_color="transparent"); r.pack(fill="x", pady=(5, 15))
+            ctk.CTkEntry(r, textvariable=rom_v, font=("Courier New", 10)).pack(side="left", fill="x", expand=True, padx=(0, 10))
+            ctk.CTkButton(r, text="...", width=40, command=lambda: rom_v.set(filedialog.askdirectory() or rom_v.get())).pack(side="right")
+            def save(): self.config["roms_dir"] = rom_v.get(); next_step()
+            ctk.CTkButton(main_container, text="Siguiente →", fg_color=COLORS["accent"], text_color=COLORS["bg_dark"], font=("Courier New", 12, "bold"), command=save).pack(pady=30)
 
-        def show_intro():
-            clear_content()
-            header = ctk.CTkFrame(content_f, fg_color=COLORS["bg_mid"], height=100, corner_radius=0)
-            header.pack(fill="x", side="top")
-            ctk.CTkLabel(header, text=f"✨ BIENVENIDO A {APP_NAME.upper()}", 
-                         font=("Courier New", 22, "bold"), text_color=COLORS["accent"]).pack(pady=25)
+        def step_retroarch():
+            ctk.CTkLabel(main_container, text="🕹️ Emulación", font=("Courier New", 18, "bold"), text_color=COLORS["accent"]).pack(pady=(40, 10))
+            ctk.CTkLabel(main_container, text="Se recomienda instalar RetroArch automáticamente.", font=("Courier New", 11), text_color=COLORS["text_dim"]).pack(pady=(0, 30))
+            auto = ctk.CTkFrame(main_container, fg_color=COLORS["bg_card"], corner_radius=12, border_width=1, border_color=COLORS["border"])
+            auto.pack(fill="x", padx=40)
+            ctk.CTkLabel(auto, text="📥 Instalación Silenciosa", font=("Courier New", 13, "bold"), text_color=COLORS["green"]).pack(anchor="w", padx=20, pady=(15, 5))
+            def do_auto(): self._install_retroarch(tk.StringVar(), tk.StringVar(), lambda p: next_step(), win)
+            ctk.CTkButton(auto, text="Instalar Ahora", fg_color=COLORS["accent"], text_color=COLORS["bg_dark"], font=("Courier New", 11, "bold"), command=do_auto).pack(pady=(0, 15))
+            ctk.CTkButton(main_container, text="Configurar después", fg_color="transparent", text_color=COLORS["text_dim"], command=next_step).pack(pady=20)
 
-            main = ctk.CTkScrollableFrame(content_f, fg_color="transparent")
-            main.pack(fill="both", expand=True, padx=30, pady=20)
+        def step_achievements():
+            ctk.CTkLabel(main_container, text="🏆 Logros", font=("Courier New", 18, "bold"), text_color=COLORS["accent"]).pack(pady=(40, 10))
+            f = ctk.CTkFrame(main_container, fg_color=COLORS["bg_card"], corner_radius=12)
+            f.pack(fill="x", padx=40, pady=25)
+            u_v, k_v = tk.StringVar(value=self.config.get("ra_user", "")), tk.StringVar(value=self.config.get("ra_apikey", ""))
+            ctk.CTkLabel(f, text="Usuario").pack(anchor="w")
+            ctk.CTkEntry(f, textvariable=u_v).pack(fill="x", pady=(5, 10))
+            ctk.CTkLabel(f, text="API Key").pack(anchor="w")
+            ctk.CTkEntry(f, textvariable=k_v, show="*").pack(fill="x", pady=(5, 10))
+            def save(): self.config["ra_user"] = u_v.get().strip(); self.config["ra_apikey"] = k_v.get().strip(); next_step()
+            ctk.CTkButton(main_container, text="Finalizar →", fg_color=COLORS["accent"], text_color=COLORS["bg_dark"], font=("Courier New", 12, "bold"), command=save).pack(pady=30)
 
-            ctk.CTkLabel(main, text=f"{APP_NAME} es tu centro de emulación todo-en-uno.", 
-                         font=("Courier New", 12), text_color=COLORS["text_bright"], wraplength=550, justify="left").pack(pady=(0, 20))
+        def step_finish():
+            ctk.CTkLabel(main_container, text="✨ ¡Todo listo!", font=("Courier New", 22, "bold"), text_color=COLORS["green"]).pack(pady=60)
+            self.config["first_run"] = False; self.config["nexus_first_run"] = False; save_config(self.config)
+            ctk.CTkButton(main_container, text="🚀 Entrar al Nexus", fg_color=COLORS["accent"], text_color=COLORS["bg_dark"], font=("Courier New", 15, "bold"), height=50, width=250, command=win.destroy).pack(pady=20)
+            def on_dest(e): self.deiconify(); self._load_games()
+            win.bind("<Destroy>", on_dest)
 
-            features = [
-                ("📁 Gestión de ROMs", "Organiza tus juegos automáticamente."),
-                ("🖼️ Carátulas Automáticas", "Descargamos las portadas por ti."),
-                ("⚙️ Instalador de Emuladores", "Instala RetroArch con un solo clic."),
-                ("🏆 Logros", "Soporte nativo para RetroAchievements."),
-                ("⏱️ Registro de Tiempo", "Guardamos cuánto tiempo has jugado.")
-            ]
+        show_step()
 
-            for emoji_title, desc in features:
-                f = ctk.CTkFrame(main, fg_color=COLORS["bg_card"], corner_radius=10)
-                f.pack(fill="x", pady=6)
-                ctk.CTkLabel(f, text=emoji_title, font=("Courier New", 13, "bold"), text_color=COLORS["yellow"]).pack(anchor="w", padx=15, pady=(8, 2))
-                ctk.CTkLabel(f, text=desc, font=("Courier New", 11), text_color=COLORS["text_bright"]).pack(anchor="w", padx=15, pady=(0, 8))
-
-            def finish():
-                self.config["first_run"] = False
-                self.config["nexus_first_run"] = False
-                save_config(self.config)
-                win.destroy()
-                if messagebox.askyesno("Configuración inicial", "¿Deseas ir ahora a los ajustes para configurar tus carpetas de juegos?", parent=self):
-                    self._open_settings()
-
-            ctk.CTkButton(content_f, text="🚀 ¡Empezar ahora!", fg_color=COLORS["accent"], hover_color=COLORS["accent2"],
-                          font=("Courier New", 14, "bold"), height=45, width=240,
-                          command=finish).pack(pady=20)
-
-        show_install_mode()
-
-    def _show_achievements_assistant(self):
-        win = ctk.CTkToplevel(self)
-        win.title("🏆 Asistente de Logros (RetroAchievements)")
-        win.geometry("600x500")
-        win.configure(fg_color=COLORS["bg_dark"])
-        win.attributes("-topmost", True)
+    def _perform_uninstallation(self):
+        """Borra toda la configuración y datos del programa."""
+        if not messagebox.askyesno("Confirmar Desinstalación", 
+                                   f"¿Estás seguro de que deseas desinstalar {APP_NAME}?\n\nEsto eliminará toda tu configuración, carátulas y el acceso directo del escritorio.",
+                                   parent=self):
+            return
         
-        # Header
-        header = ctk.CTkFrame(win, fg_color=COLORS["bg_mid"], height=70, corner_radius=0)
-        header.pack(fill="x", side="top")
-        ctk.CTkLabel(header, text="🏆 CONFIGURAR LOGROS", font=("Courier New", 18, "bold"), text_color=COLORS["accent"]).pack(pady=20)
-        
-        main_frame = ctk.CTkScrollableFrame(win, fg_color="transparent")
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        steps = [
-            ("1. Crea una cuenta", "Ve a retroachievements.org y regístrate si no tienes cuenta."),
-            ("2. Abre RetroArch", f"Inicia RetroArch desde el botón 'Lanzar' en {APP_NAME}."),
-            ("3. Menú de Ajustes", "En el menú principal de RetroArch, ve a 'Ajustes' (Settings)."),
-            ("4. Apartado Logros", "Busca la opción 'Logros' (Achievements) dentro de Ajustes."),
-            ("5. Activar y Login", "Cambia 'Logros' a 'ON' e introduce tu Usuario y Contraseña."),
-            ("6. ¡Listo!", "Los logros aparecerán automáticamente al cargar juegos compatibles.")
-        ]
-        
-        for i, (title, desc) in enumerate(steps):
-            step_f = ctk.CTkFrame(main_frame, fg_color=COLORS["bg_card"], corner_radius=8)
-            step_f.pack(fill="x", pady=5, padx=5)
+        if not messagebox.askyesno("ADVERTENCIA FINAL", 
+                                   "Esta acción no se puede deshacer. Se borrarán todos los datos locales de la aplicación. Los juegos NO se borrarán.",
+                                   parent=self):
+            return
+
+        try:
+            # 1. Borrar archivos de config
+            if os.path.exists(CONFIG_FILE): os.remove(CONFIG_FILE)
+            if os.path.exists(PLAYTIME_FILE): os.remove(PLAYTIME_FILE)
             
-            ctk.CTkLabel(step_f, text=title, font=("Courier New", 13, "bold"), text_color=COLORS["yellow"]).pack(anchor="w", padx=15, pady=(10, 2))
-            ctk.CTkLabel(step_f, text=desc, font=("Courier New", 11), text_color=COLORS["text_bright"], wraplength=500, justify="left").pack(anchor="w", padx=15, pady=(0, 10))
-
-        # Footer Actions
-        footer = ctk.CTkFrame(win, fg_color=COLORS["bg_mid"], height=80, corner_radius=0)
-        footer.pack(fill="x", side="bottom")
-        
-        def open_web():
-            import webbrowser
-            webbrowser.open("https://retroachievements.org/createaccount.php")
+            # 2. Borrar caché de carátulas
+            cache_dir = self.config.get("covers_cache")
+            if cache_dir and os.path.exists(cache_dir):
+                import shutil
+                shutil.rmtree(cache_dir, ignore_errors=True)
             
-        def launch_ra():
-            ra_path = self.config.get("retroarch_path", "")
-            if ra_path and os.path.exists(ra_path):
-                try:
-                    subprocess.Popen([ra_path])
-                except Exception as e:
-                    messagebox.showerror("Error", f"No se pudo lanzar RetroArch: {e}")
-            else:
-                messagebox.showwarning("RetroArch no encontrado", "Primero configura la ruta de RetroArch en Ajustes.")
+            # 3. Borrar acceso directo
+            desktop = os.path.join(os.environ['USERPROFILE'], 'Desktop')
+            shortcut = os.path.join(desktop, f"{APP_NAME}.lnk")
+            if os.path.exists(shortcut): os.remove(shortcut)
+            
+            # 4. Si hay archivo portable, borrarlo
+            if os.path.exists(PORTABLE_FILE): os.remove(PORTABLE_FILE)
 
-        ctk.CTkButton(footer, text="🌐 Crear cuenta", fg_color=COLORS["bg_hover"], hover_color=COLORS["bg_card"], 
-                      border_width=1, border_color=COLORS["border"],
-                      command=open_web, font=("Courier New", 11, "bold")).pack(side="left", padx=10, pady=20)
-                      
-        ctk.CTkButton(footer, text="🚀 Lanzar RetroArch", fg_color=COLORS["accent"], hover_color=COLORS["accent2"], 
-                      command=launch_ra, font=("Courier New", 12, "bold")).pack(side="left", padx=10, pady=20)
-                      
-        ctk.CTkButton(footer, text="Entendido", fg_color=COLORS["bg_hover"], border_width=1, border_color=COLORS["border"],
-                      command=win.destroy, font=("Courier New", 12, "bold")).pack(side="right", padx=10, pady=20)
+            messagebox.showinfo(APP_NAME, "Desinstalación completada. La aplicación se cerrará ahora.")
+            self.quit()
+        except Exception as e:
+            messagebox.showerror("Error", f"Ocurrió un error durante la desinstalación: {e}")
 
     # ════════ Configuración ══════════════════════════════════════════════
     def _open_settings(self):
@@ -1948,11 +1992,16 @@ class RetroLauncher(ctk.CTk):
         refresh_cores_status(self.config.get("cores_dir",""))
 
         ctk.CTkButton(scroll, text="🔍  Verificar cores", font=("Courier New",10),
-                      fg_color="transparent", hover_color=COLORS["bg_hover"],
+                      fg_color=COLORS["bg_card"], hover_color=COLORS["bg_hover"],
                       border_width=1, border_color=COLORS["border"],
-                      text_color=COLORS["text_dim"],
-                      command=lambda: refresh_cores_status(cores_var.get())
-        ).pack(padx=16, pady=(0,16), anchor="w")
+                      command=refresh_cores_status).pack(pady=12)
+
+        # Línea de versión
+        version_f = ctk.CTkFrame(win, fg_color="transparent")
+        version_f.pack(side="bottom", fill="x", pady=10)
+        ctk.CTkLabel(version_f, text=f"{APP_NAME} v{CURRENT_VERSION}", 
+                     font=("Courier New", 10), text_color=COLORS["text_dim"]).pack()
+
 
         # ── Instalación Automática ──
         ctk.CTkLabel(scroll, text="📦  Instalación de RetroArch y Cores",
@@ -2013,6 +2062,13 @@ class RetroLauncher(ctk.CTk):
                      fg_color=COLORS["bg_card"], text_color=COLORS["text_bright"],
                      border_color=COLORS["border"], show="*").pack(side="left")
 
+        # ── Peligro ──
+        ctk.CTkLabel(scroll, text="⚠️  Zona de Peligro", font=("Courier New",13,"bold"), text_color=COLORS["red"]).pack(anchor="w", padx=16, pady=(20,4))
+        ctk.CTkButton(scroll, text="🗑️  Desinstalar aplicación y borrar datos", 
+                      font=("Courier New",11,"bold"), fg_color="transparent", border_width=1, border_color=COLORS["red"],
+                      text_color=COLORS["red"], hover_color="#330000", height=36,
+                      command=self._perform_uninstallation).pack(padx=16, pady=(0,20))
+
         def save():
             self.config["retroarch_path"] = ra_var.get()
             self.config["cores_dir"]      = cores_var.get()
@@ -2032,5 +2088,5 @@ class RetroLauncher(ctk.CTk):
 
 
 if __name__ == "__main__":
-    app = RetroLauncher()
+    app = ChvstxNexus()
     app.mainloop()
