@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import filedialog, messagebox
-import json, os, subprocess, threading, requests, re, time, datetime, zipfile
+import json, os, subprocess, threading, requests, re, time, datetime, zipfile, shutil, tempfile, webbrowser
 try:
     import py7zr
 except ImportError:
@@ -17,7 +17,7 @@ from io import BytesIO
 import sys
 
 # ─── Configuración Global ────────────────────────────────────────────────────
-CURRENT_VERSION = "1.0.0"
+CURRENT_VERSION = "0.9.0"
 APP_NAME = "Chvstx Nexus"
 REPO_URL = "https://github.com/DavidFR-2000/ChvstxNexux"
 UPDATE_URL = "https://api.github.com/repos/DavidFR-2000/ChvstxNexux/releases/latest"
@@ -320,6 +320,7 @@ class RetroLauncher(ctk.CTk):
         self.current_console = None
         self.current_view    = "library"
         self.games_list      = []
+        self.update_url_exe  = None
         
         self.search_var      = tk.StringVar()
         self.search_var.trace("w", lambda *a: self.filter_games())
@@ -470,14 +471,74 @@ class RetroLauncher(ctk.CTk):
                 data = response.json()
                 latest_version = data.get("tag_name", "").replace("v", "")
                 if latest_version and latest_version != CURRENT_VERSION:
+                    # Buscar el ejecutable en assets
+                    for asset in data.get("assets", []):
+                        if asset.get("name", "").endswith(".exe"):
+                            self.update_url_exe = asset.get("browser_download_url")
+                            break
                     self.after(0, self._show_update_notification)
         except:
             pass
 
     def _show_update_notification(self):
         if hasattr(self, "update_btn"):
+            self.update_btn.configure(text="🚀 Actualizar", command=self._start_auto_update)
             self.update_btn.pack(side="left", padx=(10,0))
-            self._set_status(f"✨ ¡Nueva versión disponible! ({CURRENT_VERSION} → Nueva)")
+            self._set_status(f"✨ ¡Nueva versión disponible!")
+
+    def _start_auto_update(self):
+        if not self.update_url_exe:
+            messagebox.showinfo(APP_NAME, "No hay un archivo directo para actualizar. Visita el repositorio.")
+            webbrowser.open(REPO_URL)
+            return
+        
+        if messagebox.askyesno(APP_NAME, "¿Deseas descargar e instalar la nueva actualización ahora?"):
+            self.update_btn.configure(state="disabled", text="Descargando...")
+            threading.Thread(target=self._download_update_thread, daemon=True).start()
+
+    def _download_update_thread(self):
+        try:
+            temp_dir = tempfile.gettempdir()
+            new_exe_path = os.path.join(temp_dir, "Nexus_Update.exe")
+            
+            self._set_status("Descargando actualización...")
+            r = requests.get(self.update_url_exe, stream=True, timeout=30)
+            if r.status_code == 200:
+                with open(new_exe_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                
+                self.after(0, lambda: self._apply_update_and_restart(new_exe_path))
+            else:
+                self.after(0, lambda: messagebox.showerror("Error", "No se pudo descargar el archivo."))
+                self.after(0, lambda: self.update_btn.configure(state="normal", text="🚀 Reintentar"))
+        except Exception as e:
+            self.after(0, lambda: messagebox.showerror("Error", f"Fallo en la descarga: {e}"))
+            self.after(0, lambda: self.update_btn.configure(state="normal", text="🚀 Reintentar"))
+
+    def _apply_update_and_restart(self, new_exe_path):
+        current_exe = sys.executable if getattr(sys, 'frozen', False) else None
+        
+        if not current_exe:
+            messagebox.showinfo(APP_NAME, "Actualización descargada. Ejecútala manualmente desde:\n" + new_exe_path)
+            # Abrir carpeta del archivo
+            subprocess.run(f'explorer /select,"{new_exe_path}"')
+            return
+
+        # Script Batch para el intercambio de archivos
+        bat_path = os.path.join(tempfile.gettempdir(), "nexus_updater.bat")
+        with open(bat_path, "w") as f:
+            f.write(f"@echo off\n")
+            f.write(f"timeout /t 2 /nobreak > nul\n") # Esperar a que se cierre la app
+            f.write(f'move /y "{new_exe_path}" "{current_exe}"\n')
+            f.write(f'start "" "{current_exe}"\n')
+            f.write(f'del "%~f0"\n') # Borrar el propio .bat
+
+        self._set_status("Reiniciando para aplicar actualización...")
+        subprocess.Popen([bat_path], shell=True)
+        self.quit()
+        sys.exit()
 
     # ════════ Vistas ════════════════════════════════════════════════════
     def _set_view(self, view):
