@@ -15,9 +15,11 @@ from PIL import Image, ImageDraw, ImageOps
 import webbrowser
 from io import BytesIO
 import sys
+import difflib
+import unicodedata
 
 # ─── Configuración Global ────────────────────────────────────────────────────
-CURRENT_VERSION = "1.4.3"
+CURRENT_VERSION = "2.0.0"
 APP_NAME = "Chvstx Nexus"
 REPO_URL = "https://github.com/DavidFR-2000/ChvstxNexux"
 UPDATE_URL = "https://api.github.com/repos/DavidFR-2000/ChvstxNexux/releases/latest"
@@ -57,51 +59,82 @@ COLORS = {
 }
 
 CONSOLES = {
+    # Arcade & Early Home
+    "Arcade (MAME)": {"emoji":"👾","color":"#ff0033","extensions":[".zip",".7z"],              "emulator_key":"mame",     "rawg_platform":111},
+    "Atari 2600": {"emoji":"📺","color":"#c19a6b","extensions":[".a26",".bin",".rom",".zip"],"emulator_key":"atari2600","rawg_platform":23},
+    
+    # Nintendo
+    "NES":        {"emoji":"🟥","color":"#e63946","extensions":[".nes",".zip"],                 "emulator_key":"nes",      "rawg_platform":49},
     "SNES":       {"emoji":"🎮","color":"#9b5de5","extensions":[".sfc",".smc",".zip"],         "emulator_key":"snes",     "rawg_platform":10},
-    "GBA":        {"emoji":"🕹️","color":"#00b4d8","extensions":[".gba",".zip"],                "emulator_key":"gba",      "rawg_platform":24},
-    "NDS":        {"emoji":"📟","color":"#4cc9f0","extensions":[".nds",".zip"],                 "emulator_key":"nds",      "rawg_platform":77},
     "N64":        {"emoji":"🟡","color":"#f9c74f","extensions":[".z64",".n64",".v64",".zip"],   "emulator_key":"n64",      "rawg_platform":83},
     "GameCube":   {"emoji":"🟣","color":"#c77dff","extensions":[".iso",".gcm",".rvz"],          "emulator_key":"gamecube", "rawg_platform":105},
     "Game Boy":   {"emoji":"🟩","color":"#80b918","extensions":[".gb",".zip"],                  "emulator_key":"gb",       "rawg_platform":26},
-    "PS1":        {"emoji":"🎯","color":"#0066cc","extensions":[".bin",".cue",".iso",".img"],   "emulator_key":"ps1",      "rawg_platform":27},
-    "PS2":        {"emoji":"⚡","color":"#4361ee","extensions":[".iso",".bin",".img"],           "emulator_key":"ps2",      "rawg_platform":15},
-    "PSP":        {"emoji":"📱","color":"#48cae4","extensions":[".iso",".cso",".pbp"],           "emulator_key":"psp",      "rawg_platform":17},
+    "Game Boy Color":{"emoji":"🟪","color":"#b5179e","extensions":[".gbc",".zip"],               "emulator_key":"gbc",      "rawg_platform":43},
+    "GBA":        {"emoji":"🕹️","color":"#00b4d8","extensions":[".gba",".zip"],                "emulator_key":"gba",      "rawg_platform":24},
+    "NDS":        {"emoji":"📟","color":"#4cc9f0","extensions":[".nds",".zip"],                 "emulator_key":"nds",      "rawg_platform":77},
+    "Wii":        {"emoji":"📺","color":"#00b4d8","extensions":[".iso",".wbfs",".rvz"],         "emulator_key":"wii",      "rawg_platform":11},
+    
+    # Sega
+    "Master System":{"emoji":"⬛","color":"#d90429","extensions":[".sms",".zip"],               "emulator_key":"mastersystem","rawg_platform":74},
+    "Game Gear":  {"emoji":"🌈","color":"#3f37c9","extensions":[".gg",".zip"],                  "emulator_key":"gamegear", "rawg_platform":77},
     "Mega Drive": {"emoji":"🔥","color":"#f72585","extensions":[".md",".gen",".bin",".zip"],    "emulator_key":"megadrive","rawg_platform":167},
-    "Saturn":     {"emoji":"🪐","color":"#ff9f1c","extensions":[".iso",".bin",".cue"],          "emulator_key":"saturn",   "rawg_platform":107},
+    "Saturn":     {"emoji":"🪐","color":"#ff9f1c","extensions":[".iso",".bin",".cue",".m3u"],   "emulator_key":"saturn",   "rawg_platform":107},
+    "Dreamcast":  {"emoji":"🌀","color":"#fca311","extensions":[".cdi",".gdi",".chd"],          "emulator_key":"dreamcast","rawg_platform":106},
+    
+    # Sony PlayStation
+    "PS1":        {"emoji":"🎯","color":"#0066cc","extensions":[".bin",".cue",".iso",".img",".chd",".m3u"],"emulator_key":"ps1","rawg_platform":27},
+    "PS2":        {"emoji":"⚡","color":"#4361ee","extensions":[".iso",".bin",".img",".chd"],"emulator_key":"ps2",      "rawg_platform":15},
+    "PS3":        {"emoji":"🔴","color":"#b5179e","extensions":[".iso",".bin",".img"],"emulator_key":"ps3",      "rawg_platform":16},
+    "PSP":        {"emoji":"📱","color":"#48cae4","extensions":[".iso",".cso",".pbp",".chd"],"emulator_key":"psp",      "rawg_platform":17},
 }
 
 RAWG_API_KEY  = "2db521236abd45be988b71c1015f1bc3"
 
 # ─── RetroArch ───────────────────────────────────────────────────────────────
+# Dictionary of console to a list of fully-compatible library names (available cores)
+# The first element will be considered the default core if none is specified by the user.
 RA_CORES = {
-    "SNES":       "snes9x_libretro.dll",
-    "GBA":        "mgba_libretro.dll",
-    "NDS":        "melonds_libretro.dll",
-    "N64":        "mupen64plus_next_libretro.dll",
-    "GameCube":   "dolphin_libretro.dll",
-    "Game Boy":   "gambatte_libretro.dll",
-    "PS1":        "duckstation_libretro.dll",
-    "PS2":        "pcsx2_libretro.dll",
-    "PSP":        "ppsspp_libretro.dll",
-    "Mega Drive": "genesis_plus_gx_libretro.dll",
-    "Saturn":     "mednafen_saturn_libretro.dll",
+    "Arcade (MAME)": ["mame_libretro.dll", "mame2003_plus_libretro.dll", "fbneo_libretro.dll"],
+    "Atari 2600":    ["stella_libretro.dll"],
+    "NES":           ["mesen_libretro.dll", "fceumm_libretro.dll", "nestopia_libretro.dll"],
+    "SNES":          ["snes9x_libretro.dll", "bsnes_libretro.dll"],
+    "GBA":           ["mgba_libretro.dll", "vbam_libretro.dll"],
+    "NDS":           ["melonds_libretro.dll", "desmume_libretro.dll"],
+    "N64":           ["mupen64plus_next_libretro.dll", "parallel_n64_libretro.dll"],
+    "GameCube":      ["dolphin_libretro.dll"],
+    "Wii":           ["dolphin_libretro.dll"],
+    "Game Boy":      ["gambatte_libretro.dll", "sameboy_libretro.dll", "gearboy_libretro.dll"],
+    "Game Boy Color":["gambatte_libretro.dll", "sameboy_libretro.dll"],
+    "Master System": ["genesis_plus_gx_libretro.dll", "picodrive_libretro.dll"],
+    "Game Gear":     ["genesis_plus_gx_libretro.dll", "gearsystem_libretro.dll"],
+    "Mega Drive":    ["genesis_plus_gx_libretro.dll", "picodrive_libretro.dll"],
+    "Saturn":        ["mednafen_saturn_libretro.dll", "yabause_libretro.dll", "kronos_libretro.dll"],
+    "Dreamcast":     ["flycast_libretro.dll"],
+    "PS1":           ["duckstation_libretro.dll", "pcsx_rearmed_libretro.dll", "mednafen_psx_hw_libretro.dll", "mednafen_psx_libretro.dll", "swanstation_libretro.dll"],
+    "PS2":           ["pcsx2_libretro.dll", "play_libretro.dll"],
+    "PS3":           ["rpcs3_libretro.dll"],
+    "PSP":           ["ppsspp_libretro.dll"],
 }
 
 # ─── RetroAchievements API ───────────────────────────────────────────────────
 RA_BASE    = "https://retroachievements.org/API"
 
 RA_CONSOLE_IDS = {
+    "Arcade (MAME)": 53,
+    "Atari 2600": 25,
+    "NES":        7,
     "SNES":       3,
-    "GBA":        5,
-    "NDS":        18,
     "N64":        2,
     "GameCube":   16,
     "Game Boy":   4,
+    "GBA":        5,
+    "NDS":        18,
+    "Master System": 9,
+    "Mega Drive": 1,
+    "Saturn":     17,
     "PS1":        12,
     "PS2":        21,
     "PSP":        41,
-    "Mega Drive": 1,
-    "Saturn":     17,
 }
 
 def ra_search_game(game_name, console_name, ra_user="", ra_apikey=""):
@@ -235,18 +268,34 @@ def clean_rom_name(filename):
     return name
 
 def _name_similarity(a, b):
-    """Calcula similitud simple entre dos nombres (0.0 - 1.0)."""
-    a = a.lower().strip()
-    b = b.lower().strip()
-    if a == b:
-        return 1.0
-    # Palabras en común
-    words_a = set(a.split())
-    words_b = set(b.split())
-    if not words_a or not words_b:
-        return 0.0
-    common = words_a & words_b
-    return len(common) / max(len(words_a), len(words_b))
+    """Calcula similitud avanzada con penalización por diferencia de longitud excesiva."""
+    def normalize(text):
+        text = str(text).lower().strip()
+        # Eliminar caracteres especiales y acentos
+        text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
+        return re.sub(r'[^a-z0-9\s]', '', text)
+    
+    a_norm = normalize(a)
+    b_norm = normalize(b)
+    
+    if not a_norm or not b_norm: return 0.0
+    
+    # Si b tiene subtítulo y a no, comparamos solo la base
+    if ":" in b and ":" not in a:
+        b_base = normalize(b.split(":")[0])
+        score = difflib.SequenceMatcher(None, a_norm, b_base).ratio()
+    else:
+        score = difflib.SequenceMatcher(None, a_norm, b_norm).ratio()
+        
+    # El boost por substring debe ser pequeño para no preferir "Pokémon" sobre "Pokémon Red"
+    if a_norm in b_norm or b_norm in a_norm:
+        score += 0.1
+        
+    # Penalizar si las longitudes son muy distintas (evita que "Mario" sea igual a "Super Mario World")
+    len_diff = abs(len(a_norm) - len(b_norm))
+    penalty = min(0.3, (len_diff / max(len(a_norm), len(b_norm), 1)) * 0.5)
+    
+    return max(0.0, min(1.0, score - penalty))
 
 def _create_desktop_shortcut(target_exe):
     """Crea un acceso directo en el escritorio usando PowerShell."""
@@ -340,33 +389,93 @@ def download_cover(game_name, cache_dir, platform_id=None, console_name=""):
 
     return None
 
-def fetch_game_info(game_name, platform_id=None):
-    """Obtiene descripción, género, año y puntuación desde RAWG."""
-    query   = sanitize_name(game_name)
-    headers = {"User-Agent": "Mozilla/5.0"}
+def fetch_game_info(game_name, platform_id=None, console_name=""):
+    """Obtiene descripción desde Wikipedia (Español -> Inglés) y metadata técnica desde RAWG."""
+    clean_name = clean_rom_name(game_name)
+    query      = sanitize_name(clean_name)
+    headers    = {"User-Agent": "RetroLauncher/1.1 (https://github.com/)"}
+    
+    data = {"desc": "", "genres": "—", "year": "—", "rating": 0, "name": game_name}
+
+    def get_wiki_desc(q, lang="es"):
+        try:
+            url = f"https://{lang}.wikipedia.org/w/api.php"
+            params = {
+                "action": "query", "list": "search", "srsearch": q,
+                "format": "json", "utf8": 1, "srlimit": 5
+            }
+            res = requests.get(url, params=params, headers=headers, timeout=5)
+            if res.status_code == 200:
+                results = res.json().get("query", {}).get("search", [])
+                if not results: return None, 0
+                
+                best_res = None
+                max_sim = -1
+                for r in results:
+                    title = r["title"]
+                    # Evitar desambiguaciones
+                    if "(desambiguación)" in title.lower() or "(disambiguation)" in title.lower(): continue
+                    
+                    sim = _name_similarity(clean_name, title)
+                    if sim > max_sim:
+                        max_sim = sim
+                        best_res = r
+                
+                if best_res and max_sim > 0.35:
+                    ext_params = {
+                        "action": "query", "prop": "extracts", "exintro": 1,
+                        "explaintext": 1, "titles": best_res["title"], "format": "json"
+                    }
+                    res2 = requests.get(url, params=ext_params, headers=headers, timeout=5)
+                    pages = res2.json().get("query", {}).get("pages", {})
+                    for _, pdata in pages.items():
+                        ext = pdata.get("extract", "")
+                        if ext:
+                            desc = (ext[:500] + "...") if len(ext) > 500 else ext
+                            return {"desc": desc, "name": best_res["title"]}, max_sim
+        except: pass
+        return None, 0
+
+    # 1. Intentar Wikipedia Español
+    wiki_data, sim_es = get_wiki_desc(f"{clean_name} {console_name} videojuego", "es")
+    
+    # 2. Si falló o la similitud es baja, intentar Wikipedia Inglés
+    if not wiki_data or sim_es < 0.6:
+        wiki_en, sim_en = get_wiki_desc(f"{clean_name} {console_name} video game", "en")
+        if wiki_en and sim_en > sim_es:
+            wiki_data = wiki_en
+            
+    if wiki_data:
+        data["desc"] = wiki_data["desc"]
+        data["name"] = wiki_data["name"]
+
+    # 3. Datos técnicos desde RAWG (siempre útil para Rating/Año/Géneros)
     try:
-        url = (f"https://api.rawg.io/api/games?search={requests.utils.quote(query)}"
-               f"&key={RAWG_API_KEY}&page_size=1")
-        if platform_id:
-            url += f"&platforms={platform_id}"
-        r = requests.get(url, headers=headers, timeout=6)
+        rawg_url = (f"https://api.rawg.io/api/games?search={requests.utils.quote(query)}"
+                    f"&key={RAWG_API_KEY}&page_size=5")
+        if platform_id: rawg_url += f"&platforms={platform_id}"
+        
+        r = requests.get(rawg_url, headers=headers, timeout=5)
         if r.status_code == 200:
             results = r.json().get("results", [])
-            if results:
-                g = results[0]
-                desc = ""
-                dr = requests.get(f"https://api.rawg.io/api/games/{g['id']}?key={RAWG_API_KEY}",
-                                   headers=headers, timeout=6)
-                if dr.status_code == 200:
-                    raw = dr.json().get("description_raw", "")
-                    desc = (raw[:400] + "...") if len(raw) > 400 else raw
-                genres = ", ".join(ge["name"] for ge in g.get("genres", [])[:3])
-                year   = g.get("released", "")[:4] if g.get("released") else "—"
-                return {"desc": desc, "genres": genres, "year": year,
-                        "rating": g.get("rating", 0), "name": g.get("name", game_name)}
-    except Exception:
-        pass
-    return None
+            scored = sorted([(_name_similarity(clean_name, res.get("name","")), res) 
+                           for res in results if _name_similarity(clean_name, res.get("name","")) > 0.4],
+                          key=lambda x: x[0], reverse=True)
+            
+            if scored:
+                g = scored[0][1]
+                if not data["desc"]: # Si Wiki falló, grab description from RAWG
+                    dr = requests.get(f"https://api.rawg.io/api/games/{g['id']}?key={RAWG_API_KEY}", timeout=5)
+                    raw = dr.json().get("description_raw", "") if dr.status_code==200 else ""
+                    data["desc"] = (raw[:450] + "...") if len(raw) > 450 else raw
+                
+                data["genres"] = ", ".join(ge["name"] for ge in g.get("genres", [])[:3])
+                data["year"]   = g.get("released", "")[:4] if g.get("released") else "—"
+                data["rating"] = g.get("rating", 0)
+                if data["name"] == game_name: data["name"] = g.get("name")
+    except: pass
+
+    return data if (data["desc"] or data["rating"] > 0) else None
 
 def make_placeholder(game_name, color, size=(300, 200)):
     img  = Image.new("RGB", size, "#0a0a0f")
@@ -413,7 +522,11 @@ class ChvstxNexus(ctk.CTk):
 
         # Build UI and Load
         self._build_ui()
-        self._select_console(list(CONSOLES.keys())[0])
+        
+        # Seleccionar primera consola disponible si existe
+        active_list = self.config.get("active_consoles", [])
+        if active_list and active_list[0] in CONSOLES:
+            self._select_console(active_list[0])
 
         # Si es la primera vez (o primera vez en Nexus), mostrar el asistente
         if check_branding_migration(self.config):
@@ -425,67 +538,88 @@ class ChvstxNexus(ctk.CTk):
 
     # ════════ UI ════════════════════════════════════════════════════════
     def _build_ui(self):
-        self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(0, weight=1)
-        self._build_sidebar()
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1) # Main content takes up the rest
+        self._build_top_nav()
         self._build_main()
 
-    def _build_sidebar(self):
-        sb = ctk.CTkFrame(self, width=270, corner_radius=0,
-                          fg_color=COLORS["bg_mid"],
-                          border_width=1, border_color=COLORS["border"])
-        sb.grid(row=0, column=0, sticky="nsew")
-        sb.grid_propagate(False)
-        sb.grid_columnconfigure(0, weight=1)
+    def _build_top_nav(self):
+        nav = ctk.CTkFrame(self, height=60, corner_radius=0,
+                           fg_color=COLORS["bg_mid"],
+                           border_width=1, border_color=COLORS["border"])
+        nav.grid(row=0, column=0, sticky="ew")
+        nav.grid_propagate(False)
+        nav.grid_rowconfigure(0, weight=1)
 
-        logo = ctk.CTkFrame(sb, fg_color="transparent")
-        logo.grid(row=0, column=0, padx=20, pady=(28,4), sticky="ew")
-        ctk.CTkLabel(logo, text="CHVSTX",    font=("Courier New",22,"bold"), text_color=COLORS["accent"]).pack(side="left")
+        # 1. Logo (Izquierda)
+        logo = ctk.CTkFrame(nav, fg_color="transparent")
+        logo.pack(side="left", padx=20, pady=10)
+        ctk.CTkLabel(logo, text="CHVSTX", font=("Courier New",22,"bold"), text_color=COLORS["accent"]).pack(side="left")
         ctk.CTkLabel(logo, text=" NEXUS", font=("Courier New",22,"bold"), text_color=COLORS["text_bright"]).pack(side="left")
 
-        ctk.CTkLabel(sb, text="— VISTAS —", font=("Courier New",9),
-                     text_color=COLORS["text_dim"]).grid(row=1,column=0,padx=20,pady=(4,6),sticky="w")
-
-        self.view_btns = {}
-        for i,(label,key) in enumerate([("📚  Biblioteca","library"),("⭐  Favoritos","favorites"),("📊  Estadísticas","stats")]):
-            b = ctk.CTkButton(sb, text=label, font=("Courier New",12,"bold"),
-                              fg_color="transparent", hover_color=COLORS["bg_hover"],
-                              text_color=COLORS["text_dim"], anchor="w", height=38, corner_radius=8,
-                              command=lambda k=key: self._set_view(k))
-            b.grid(row=2+i, column=0, padx=12, pady=2, sticky="ew")
-            self.view_btns[key] = b
-
-        ctk.CTkLabel(sb, text="— CONSOLAS —", font=("Courier New",9),
-                     text_color=COLORS["text_dim"]).grid(row=6,column=0,padx=20,pady=(10,6),sticky="w")
-
+        # 2. XMB Categories (Centro - Scrollable horizontal o Frame normal si caben)
+        self.categories_frame = ctk.CTkScrollableFrame(nav, orientation="horizontal", 
+                                                       fg_color="transparent", height=60)
+        self.categories_frame.pack(side="left", fill="both", expand=True, padx=20)
+        # Fix the scrollbar taking space in horizontal mode slightly
+        self.categories_frame._scrollbar.grid_remove() 
+        
         self.console_buttons = {}
-        for i,(name,info) in enumerate(CONSOLES.items()):
-            b = ctk.CTkButton(sb, text=f"  {info['emoji']}  {name}",
-                              font=("Courier New",12,"bold"), fg_color="transparent",
+        active = self.config.get("active_consoles", [])
+        
+        # Filtrar solo consolas activas y que existan en CONSOLES
+        active_consoles = []
+        for cn in active:
+            if cn in CONSOLES:
+                active_consoles.append(cn)
+                
+        for i, name in enumerate(active_consoles):
+            info = CONSOLES[name]
+            b = ctk.CTkButton(self.categories_frame, text=f"{info['emoji']} {name}",
+                              font=("Courier New",14,"bold"), fg_color="transparent",
                               hover_color=COLORS["bg_hover"], text_color=COLORS["text_dim"],
-                              anchor="w", height=38, corner_radius=8,
+                              height=40, width=80, corner_radius=20,
                               command=lambda n=name: self._select_console(n))
-            b.grid(row=7+i, column=0, padx=12, pady=2, sticky="ew")
+            b.pack(side="left", padx=5, pady=5)
             self.console_buttons[name] = b
 
-        ctk.CTkFrame(sb, height=1, fg_color=COLORS["border"]).grid(
-            row=7+len(CONSOLES), column=0, padx=12, pady=12, sticky="ew")
-
-        ctk.CTkButton(sb, text="🌐  Descargas", font=("Courier New",12,"bold"),
-                      fg_color=COLORS["accent"], hover_color=COLORS["accent2"],
-                      text_color=COLORS["text_bright"], anchor="w",
-                      command=self._open_homebrew_hub).grid(row=8+len(CONSOLES),column=0,padx=12,pady=(0,6),sticky="ew")
-
-        ctk.CTkButton(sb, text="⚙  Configuración", font=("Courier New",12),
-                      fg_color="transparent", hover_color=COLORS["bg_hover"],
-                      text_color=COLORS["text_dim"], anchor="w",
-                      command=self._open_settings).grid(row=9+len(CONSOLES),column=0,padx=12,pady=(0,20),sticky="ew")
+        # 3. Actions (Derecha)
+        actions = ctk.CTkFrame(nav, fg_color="transparent")
+        actions.pack(side="right", padx=20)
+        
+        self.view_btns = {}
+        # Boton "Vistas" toggle (Favorites/Library) - For now let's just add Favs as a star button
+        
+        fav_btn = ctk.CTkButton(actions, text="⭐", font=("Courier New",18), width=40, height=40,
+                                fg_color="transparent", hover_color=COLORS["bg_hover"], text_color=COLORS["text_bright"],
+                                command=lambda: self._set_view("favorites") if self.current_view == "library" else self._set_view("library"))
+        fav_btn.pack(side="left", padx=5)
+        self.view_btns["favorites"] = fav_btn
+        
+        hb_btn = ctk.CTkButton(actions, text="🌐", font=("Courier New",18), width=40, height=40,
+                               fg_color="transparent", hover_color=COLORS["bg_hover"], text_color=COLORS["accent"],
+                               command=self._open_homebrew_hub)
+        hb_btn.pack(side="left", padx=5)
+        
+        set_btn = ctk.CTkButton(actions, text="⚙", font=("Courier New",20), width=40, height=40,
+                                fg_color="transparent", hover_color=COLORS["bg_hover"], text_color=COLORS["text_dim"],
+                                command=self._open_settings)
+        set_btn.pack(side="left", padx=5)
 
     def _build_main(self):
-        self.main_frame = ctk.CTkFrame(self, fg_color=COLORS["bg_dark"], corner_radius=0)
-        self.main_frame.grid(row=0, column=1, sticky="nsew")
+        # We also create a container for settings so we can swap between games and settings inline.
+        self.main_container = ctk.CTkFrame(self, fg_color=COLORS["bg_dark"], corner_radius=0)
+        self.main_container.grid(row=1, column=0, sticky="nsew")
+        self.main_container.grid_rowconfigure(0, weight=1)
+        self.main_container.grid_columnconfigure(0, weight=1)
+
+        self.main_frame = ctk.CTkFrame(self.main_container, fg_color=COLORS["bg_dark"], corner_radius=0)
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
         self.main_frame.grid_rowconfigure(2, weight=1)
         self.main_frame.grid_columnconfigure(0, weight=1)
+        
+        self.settings_frame_container = ctk.CTkFrame(self.main_container, fg_color=COLORS["bg_dark"], corner_radius=0)
+        # Do not grid settings_frame_container yet
 
         # Header
         hdr = ctk.CTkFrame(self.main_frame, fg_color=COLORS["bg_mid"], corner_radius=0,
@@ -697,24 +831,34 @@ class ChvstxNexus(ctk.CTk):
     # ════════ Vistas ════════════════════════════════════════════════════
     def _set_view(self, view):
         self.current_view = view
-        for k, b in self.view_btns.items():
-            if k == view:
-                b.configure(fg_color=COLORS["bg_hover"], text_color=COLORS["accent"],
-                            border_width=1, border_color=COLORS["accent"])
-            else:
-                b.configure(fg_color="transparent", text_color=COLORS["text_dim"], border_width=0)
+        
+        # Ocultar primero el settings si estaba abierto
+        if hasattr(self, "settings_frame_container") and self.settings_frame_container.winfo_ismapped():
+            self.settings_frame_container.grid_remove()
+            self.main_frame.grid(row=0, column=0, sticky="nsew")
 
         if view == "library":
+            if "favorites" in getattr(self, "view_btns", {}):
+                self.view_btns["favorites"].configure(text_color=COLORS["text_bright"]) # Apagar estrella
             self.stats_frame.grid_remove()
             self.games_scroll.grid(row=0, column=0, sticky="nsew")
             self.search_entry.configure(state="normal")
             if self.current_console:
                 self._select_console(self.current_console)
         elif view == "favorites":
+            if "favorites" in getattr(self, "view_btns", {}):
+                self.view_btns["favorites"].configure(text_color=COLORS["yellow"]) # Encender estrella
             self.stats_frame.grid_remove()
             self.games_scroll.grid(row=0, column=0, sticky="nsew")
             self.search_entry.configure(state="normal")
             self._show_favorites()
+            
+            # Quitar highlight de todas las consolas porque estamos viendo favoritos globales
+            for k, b in self.console_buttons.items():
+                b.configure(fg_color="transparent", text_color=COLORS["text_dim"])
+            self.console_title.configure(text="⭐  Favoritos", text_color=COLORS["yellow"])
+            self.current_console = None
+
         elif view == "stats":
             self.games_scroll.grid_remove()
             self.stats_frame.grid(row=0, column=0, sticky="nsew")
@@ -865,6 +1009,10 @@ class ChvstxNexus(ctk.CTk):
         self._img_labels = {}
 
     def _render_games(self, games):
+        # Cancel any ongoing render
+        self._current_render_id = getattr(self, "_current_render_id", 0) + 1
+        current_id = self._current_render_id
+        
         self._clear_scroll()
         if not games:
             ctk.CTkLabel(self.games_scroll,
@@ -872,17 +1020,33 @@ class ChvstxNexus(ctk.CTk):
                 font=("Courier New",13), text_color=COLORS["text_dim"], justify="center"
             ).pack(expand=True, pady=80)
             return
-        cols = 5
-        self.games_scroll.grid_columnconfigure(tuple(range(cols)), weight=1)
-        for i, gf in enumerate(games):
-            r, c = divmod(i, cols)
-            card = self._make_game_card(gf, self.current_console)
-            card.grid(row=r, column=c, padx=10, pady=10, sticky="nsew")
-        threading.Thread(
-            target=self._load_covers_for_list,
-            args=(list(games), [self.current_console]*len(games)),
-            daemon=True
-        ).start()
+            
+        self.games_scroll.grid_columnconfigure(0, weight=1)
+        
+        games_list = list(games)
+        
+        def _anim_add(idx):
+            if self._current_render_id != current_id: return # Abort if view changed
+            
+            # Múltiples items para mayor fluidez y optimización de Tkinter
+            batch_size = 12
+            end_idx = min(idx + batch_size, len(games_list))
+            
+            for i in range(idx, end_idx):
+                gf = games_list[i]
+                card = self._make_game_card(gf, self.current_console)
+                card.grid(row=i, column=0, padx=20, pady=4, sticky="ew")
+            
+            if end_idx < len(games_list):
+                self.after(5, lambda: _anim_add(end_idx))
+            else:
+                threading.Thread(
+                    target=self._load_covers_for_list,
+                    args=(games_list, [self.current_console]*len(games_list), current_id),
+                    daemon=True
+                ).start()
+                
+        _anim_add(0)
 
     # ── Card ────────────────────────────────────────────────────────────
     def _make_game_card(self, game_file, console_name):
@@ -891,35 +1055,38 @@ class ChvstxNexus(ctk.CTk):
         is_fav = any(f["file"]==game_file and f["console"]==console_name
                      for f in self.config.get("favorites",[]))
 
-        # Card container with glass-like effect
-        card = ctk.CTkFrame(self.games_scroll, fg_color=COLORS["bg_card"], corner_radius=15,
-                            border_width=2, border_color=COLORS["border"], cursor="hand2")
+        # Card container horizontal banner
+        card = ctk.CTkFrame(self.games_scroll, fg_color=COLORS["bg_card"], corner_radius=12,
+                            border_width=1, border_color=COLORS["border"], cursor="hand2", height=120)
+        card.grid_propagate(False)
+        card.grid_columnconfigure(1, weight=1)
+        card.grid_rowconfigure(0, weight=1)
 
-        img_label = ctk.CTkLabel(card, text="", height=160)
-        img_label.pack(fill="x", padx=2, pady=2)
+        img_label = ctk.CTkLabel(card, text="")
+        img_label.grid(row=0, column=0, padx=(10, 16), pady=10)
         img_label._game_file = game_file
         self._img_labels[game_file] = img_label
         
-        ph    = make_placeholder(name, info["color"], (260,160))
-        ph_tk = ctk.CTkImage(ph, size=(260,160))
+        ph    = make_placeholder(name, info["color"], (144,100))
+        ph_tk = ctk.CTkImage(ph, size=(144,100))
         img_label.configure(image=ph_tk)
         img_label.image = ph_tk
 
         # Content area
         content_frame = ctk.CTkFrame(card, fg_color="transparent")
-        content_frame.pack(fill="both", expand=True, padx=12, pady=(8,12))
+        content_frame.grid(row=0, column=1, sticky="nsew", pady=10, padx=(0, 16))
 
         name_row = ctk.CTkFrame(content_frame, fg_color="transparent")
-        name_row.pack(fill="x")
+        name_row.pack(fill="x", pady=(4, 0))
         
-        name_label = ctk.CTkLabel(name_row, text=name.upper(), font=("Helvetica",11,"bold"),
-                                   text_color=COLORS["text_bright"], wraplength=180,
+        name_label = ctk.CTkLabel(name_row, text=name.upper(), font=("Helvetica",13,"bold"),
+                                   text_color=COLORS["text_bright"],
                                    justify="left", anchor="w")
         name_label.pack(side="left", fill="x", expand=True)
 
         fav_btn = ctk.CTkButton(name_row,
             text=("❤" if is_fav else "♡"), width=28, height=28,
-            font=("Helvetica",16), fg_color="transparent",
+            font=("Helvetica",18), fg_color="transparent",
             hover_color=COLORS["bg_hover"],
             text_color=(COLORS["red"] if is_fav else COLORS["text_dim"]),
             command=lambda gf=game_file, cn=console_name: self._toggle_favorite(gf, cn))
@@ -931,16 +1098,16 @@ class ChvstxNexus(ctk.CTk):
         pt_text = (f"⌛ {h}h {m:02d}m" if secs > 0 else "⌛ NEW")
 
         bottom = ctk.CTkFrame(content_frame, fg_color="transparent")
-        bottom.pack(fill="x", pady=(4,0))
+        bottom.pack(fill="x", side="bottom", pady=(0, 4))
         
         # Badge-like console indicator
-        console_badge = ctk.CTkFrame(bottom, fg_color=info["color"], corner_radius=10, height=18)
+        console_badge = ctk.CTkFrame(bottom, fg_color=info["color"], corner_radius=10, height=20)
         console_badge.pack(side="left")
         ctk.CTkLabel(console_badge, text=f" {info['emoji']} {console_name} ",
-                     font=("Helvetica",9,"bold"), text_color="#ffffff").pack(padx=6)
+                     font=("Helvetica",10,"bold"), text_color="#ffffff").pack(padx=8, pady=0)
         
         ctk.CTkLabel(bottom, text=pt_text,
-                     font=("Helvetica",10), text_color=COLORS["accent"]).pack(side="right")
+                     font=("Helvetica",11), text_color=COLORS["accent"]).pack(side="right")
 
         def on_enter(e):
             card.configure(border_color=COLORS["accent"], fg_color=COLORS["bg_hover"])
@@ -1029,7 +1196,7 @@ class ChvstxNexus(ctk.CTk):
         loading.pack(pady=20)
 
         def load_info():
-            data = fetch_game_info(name, info.get("rawg_platform"))
+            data = fetch_game_info(name, info.get("rawg_platform"), console_name)
             def update():
                 if not win.winfo_exists(): return
                 loading.destroy()
@@ -1037,7 +1204,7 @@ class ChvstxNexus(ctk.CTk):
                     for lbl_text, val, col in [
                         ("AÑO",       data["year"],                                          COLORS["text_bright"]),
                         ("GÉNEROS",   data["genres"] or "—",                                 COLORS["text_bright"]),
-                        ("RATING",    f"{'⭐'*int(round(data['rating']))} ({data['rating']:.1f}/5)" if data["rating"] else "—", COLORS["yellow"]),
+                        ("RATING",    f"{'⭐'*int(round(float(data['rating'])))} ({float(data['rating']):.1f}/5)" if data["rating"] else "—", COLORS["yellow"]),
                     ]:
                         rr = ctk.CTkFrame(info_frame, fg_color="transparent")
                         rr.pack(fill="x", padx=14, pady=3)
@@ -1328,17 +1495,25 @@ class ChvstxNexus(ctk.CTk):
                 f"No se encontró retroarch.exe.\nVe a ⚙ Configuración y verifica la ruta.")
             return
 
-        core_file = RA_CORES.get(cn)
-        if not core_file:
+        available_cores = RA_CORES.get(cn, [])
+        if not available_cores:
             messagebox.showerror("Core no definido",
-                f"No hay core configurado para {cn}.")
+                f"No hay cores configurados para {cn}.")
             return
+
+        # Use preferred core if it exists and is valid, otherwise fallback to the first available
+        core_prefs = self.config.get("core_preferences", {})
+        preferred = core_prefs.get(cn)
+        if preferred and preferred in available_cores:
+            core_file = preferred
+        else:
+            core_file = available_cores[0]
 
         core_path = os.path.join(cores_dir, core_file)
         if not os.path.exists(core_path):
             messagebox.showwarning("Core no instalado",
                 f"El core para {cn} no está instalado:\n{core_file}\n\n"
-                f"Descárgalo desde RetroArch:\n"
+                f"Descárgalo desde RetroArch o desde el panel de Gestión de Emuladores:\n"
                 f"Menú principal → Gestión de cores → {cn}")
             return
 
@@ -1373,13 +1548,15 @@ class ChvstxNexus(ctk.CTk):
             messagebox.showerror("Error al lanzar RetroArch", str(e))
 
     # ════════ Portadas ═══════════════════════════════════════════════════
-    def _load_covers_for_list(self, game_files, consoles):
+    def _load_covers_for_list(self, game_files, consoles, render_id=None):
         cache_dir = self.config.get("covers_cache","")
         os.makedirs(cache_dir, exist_ok=True)
         snapshot_console = self.current_console
 
         for game_file, cn in zip(game_files, consoles):
             if self.current_console != snapshot_console: break
+            if render_id is not None and getattr(self, "_current_render_id", 0) != render_id: break
+            
             name        = os.path.splitext(game_file)[0]
             cover_path  = get_cover_path(cache_dir, name)
             platform_id = CONSOLES.get(cn,{}).get("rawg_platform")
@@ -1388,20 +1565,29 @@ class ChvstxNexus(ctk.CTk):
                 result = download_cover(name, cache_dir, platform_id, console_name=cn)
             else:
                 result = cover_path
+            
             if result and os.path.exists(result):
                 try:
-                    img = ImageOps.pad(Image.open(result), (260,150), color="#0a0a0f")
+                    # En lugar de pad negro, usamos fit para recortar manteniendo proporción y llenar 144x100
+                    src_img = Image.open(result)
+                    if src_img.mode != "RGBA":
+                        src_img = src_img.convert("RGBA")
+                    img = ImageOps.fit(src_img, (144, 100), method=Image.Resampling.LANCZOS)
+                    
+                    if render_id is not None and getattr(self, "_current_render_id", 0) != render_id: break
                     self.after(0, lambda gf=game_file, i=img: self._update_cover(gf, i))
                 except:
                     pass
-        self.after(0, lambda: self._set_status(""))
+        
+        if getattr(self, "_current_render_id", 0) == render_id or render_id is None:
+            self.after(0, lambda: self._set_status(""))
 
     def _update_cover(self, game_file, img):
         label = self._img_labels.get(game_file)
         if label:
             try:
                 if label.winfo_exists():
-                    tk_img = ctk.CTkImage(img, size=(260,150))
+                    tk_img = ctk.CTkImage(img, size=(144,100))
                     label.configure(image=tk_img)
                     label.image = tk_img
             except:
@@ -1422,9 +1608,24 @@ class ChvstxNexus(ctk.CTk):
         # Los repos tienen carpetas entries/<slug>/game.json + archivos ROM
         # Los archivos se sirven directamente desde hh3.gbdev.io/entries/
         HB_REPOS = {
-            "Retrostic (Todas las consolas)": {
-                "type": "retrostic"
-            },
+            "Retrostic (Todas las consolas)": {"type": "retrostic"},
+            "R-Roms (NES)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%20Entertainment%20System/"},
+            "R-Roms (SNES)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Super%20Nintendo%20Entertainment%20System/"},
+            "R-Roms (N64)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%2064/"},
+            "R-Roms (GameCube)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Nintendo%20-%20GameCube%20-%20NKit%20RVZ%20%5B1.21.5%5D/"},
+            "R-Roms (Wii)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Nintendo%20-%20Wii%20-%20NKit%20RVZ%20%5B1.21.5%5D/"},
+            "R-Roms (Game Boy)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy/"},
+            "R-Roms (GBC)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy%20Color/"},
+            "R-Roms (GBA)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy%20Advance/"},
+            "R-Roms (NDS)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%20DS%20(Decrypted)/"},
+            "R-Roms (Master System)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Sega%20-%20Master%20System%20-%20Mark%20III/"},
+            "R-Roms (Game Gear)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Sega%20-%20Game%20Gear/"},
+            "R-Roms (Mega Drive)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Sega%20-%20Mega%20Drive%20-%20Genesis/"},
+            "R-Roms (Saturn)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Sega%20-%20Saturn/"},
+            "R-Roms (Dreamcast)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Sega%20-%20Dreamcast/"},
+            "R-Roms (PS1)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Sony%20-%20PlayStation/"},
+            "R-Roms (PS2)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Sony%20-%20PlayStation%202/"},
+            "R-Roms (PSP)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Sony%20-%20PlayStation%20Portable/"},
             "Homebrew (Game Boy)": {
                 "type": "github",
                 "api":  "https://api.github.com/repos/gbdev/database/contents/entries",
@@ -1544,6 +1745,56 @@ class ChvstxNexus(ctk.CTk):
                         set_status("Sin resultados en Retrostic.")
                         return
 
+                elif repo.get("type") == "myrient":
+                    if not query:
+                        set_status("Escribe un juego para buscar en esta consola de R-Roms.", COLORS["yellow"])
+                        return
+
+                    url = repo["url"]
+                    r = requests.get(url, headers=headers, timeout=15)
+                    r.raise_for_status()
+                    
+                    soup = BeautifulSoup(r.text, 'html.parser')
+                    # Myrient autoindex lists files in <a> tags
+                    nodes = soup.find_all('a', href=True)
+                    
+                    games = []
+                    q = query.lower()
+                    
+                    # Ignorar enlaces de navegación (../ etc)
+                    valid_exts_myrient = (".zip", ".7z", ".rar", ".rvz")
+                    
+                    for node in nodes:
+                        filename = requests.utils.unquote(node['href'])
+                        if not any(filename.lower().endswith(e) for e in valid_exts_myrient):
+                            continue
+                        
+                        if q in filename.lower():
+                            # Removemos la extension para el título
+                            title = filename.rsplit('.', 1)[0]
+                            dl_link = url + node['href']
+                            games.append({
+                                "_slug": filename,
+                                "_repo": repo,
+                                "title": title,
+                                "author": "R-Roms/Myrient",
+                                "description": f"Encontrado en {console}. Archivo: {filename}",
+                                "tags": [console.split(" ")[-1].upper()],
+                                "files": [{"url": dl_link}]
+                            })
+                            
+                            # Limitar resultados para no saturar la UI
+                            if len(games) >= 50:
+                                break
+                    
+                    if not games:
+                        win.after(0, lambda: ctk.CTkLabel(list_frame,
+                            text=f"No se encontraron roms para '{query}' en esta consola.",
+                            font=("Courier New",12), text_color=COLORS["text_dim"]
+                        ).pack(pady=40))
+                        set_status("Sin resultados en Myrient.")
+                        return
+
                 else:
                     # Paso 1: listar carpetas de entries via GitHub API
                     r = requests.get(repo["api"], headers=headers, timeout=15)
@@ -1637,18 +1888,26 @@ class ChvstxNexus(ctk.CTk):
 
                 console_name = console_var.get()
                 if dl_url:
-                    # En Retrostic le pasamos el console para intentar deducirlo
                     cns = console_name
-                    if repo.get("type") == "retrostic" and tags:
+                    if repo.get("type") in ("retrostic", "myrient") and tags:
                         cns = tags
                     
-                    ctk.CTkButton(btn_col, text="⬇ Descargar",
-                                  font=("Courier New",11,"bold"),
-                                  fg_color=COLORS["accent"], hover_color=COLORS["accent2"],
-                                  width=130, height=34,
-                                  command=lambda u=dl_url, t=title, c=cns, s=slug, rp=repo:
-                                      _download(u, t, c, s, rp)
-                    ).pack()
+                    if repo.get("type") == "myrient":
+                        ctk.CTkButton(btn_col, text="⬇ Descargar",
+                                      font=("Courier New",11,"bold"),
+                                      fg_color=COLORS["accent"], hover_color=COLORS["accent2"],
+                                      width=130, height=34,
+                                      command=lambda u=dl_url, t=title, c=cns, s=slug, rp=repo:
+                                          _download(u, t, c, s, rp)
+                        ).pack()
+                    else:
+                        ctk.CTkButton(btn_col, text="⬇ Descargar",
+                                      font=("Courier New",11,"bold"),
+                                      fg_color=COLORS["accent"], hover_color=COLORS["accent2"],
+                                      width=130, height=34,
+                                      command=lambda u=dl_url, t=title, c=cns, s=slug, rp=repo:
+                                          _download(u, t, c, s, rp)
+                        ).pack()
                 else:
                     ctk.CTkLabel(btn_col, text="Sin descarga\ndirecta",
                                  font=("Courier New",9), text_color=COLORS["text_dim"],
@@ -1715,7 +1974,8 @@ class ChvstxNexus(ctk.CTk):
                         filename = urllib.parse.unquote(target_url.split("/")[-1])
                     else:
                         target_url = url
-                        filename = url.split("/")[-1] or f"{sanitize_name(title)}.zip"
+                        import urllib.parse
+                        filename = urllib.parse.unquote(url.split("/")[-1]) or f"{sanitize_name(title)}.zip"
                         
                     filepath = os.path.join(dest_dir, filename)
                     set_status(f"⬇ Descargando {filename} en {dest_console}...", COLORS["yellow"])
@@ -1749,6 +2009,24 @@ class ChvstxNexus(ctk.CTk):
         ).pack(side="left")
 
         threading.Thread(target=fetch_games, daemon=True).start()
+
+    def _download_core(self, core_dll, target_file_path):
+        """Descarga e instala un core desde el buildbot oficial."""
+        core_zip_url = f"https://buildbot.libretro.com/nightly/windows/x86_64/latest/{core_dll}.zip"
+        target_dir = os.path.dirname(target_file_path)
+        core_zip_path = os.path.join(target_dir, f"{core_dll}.zip")
+        
+        try:
+            cr = requests.get(core_zip_url, timeout=15)
+            if cr.status_code == 200:
+                with open(core_zip_path, 'wb') as f:
+                    f.write(cr.content)
+                with zipfile.ZipFile(core_zip_path, 'r') as z:
+                    z.extractall(target_dir)
+                try: os.remove(core_zip_path)
+                except: pass
+        except Exception as e:
+            print(f"Error descargando core {core_dll}: {e}")
 
     def _install_retroarch(self, ra_var, cores_var, refresh_fn, settings_win):
         default_dir = r"C:\RetroArch-Win64"
@@ -1808,9 +2086,24 @@ class ChvstxNexus(ctk.CTk):
                 # 3. Descargar Cores
                 cores_dest = os.path.join(default_dir, "cores")
                 os.makedirs(cores_dest, exist_ok=True)
-                total_cores = len(RA_CORES)
                 
-                for i, (console, core_dll) in enumerate(RA_CORES.items()):
+                # Fetch target cores for active consoles
+                active_consoles = self.config.get("active_consoles", [])
+                core_prefs = self.config.get("core_preferences", {})
+                
+                target_cores = []
+                for console in active_consoles:
+                    available = RA_CORES.get(console, [])
+                    if not available: continue
+                    preferred = core_prefs.get(console)
+                    if preferred and preferred in available:
+                        target_cores.append((console, preferred))
+                    else:
+                        target_cores.append((console, available[0]))
+
+                total_cores = len(target_cores)
+                
+                for i, (console, core_dll) in enumerate(target_cores):
                     win.after(0, lambda c=console: lbl.configure(text=f"Descargando core: {c}..."))
                     core_zip_url = f"https://buildbot.libretro.com/nightly/windows/x86_64/latest/{core_dll}.zip"
                     core_zip_path = os.path.join(cores_dest, f"{core_dll}.zip")
@@ -1827,7 +2120,7 @@ class ChvstxNexus(ctk.CTk):
                     except Exception as ce:
                         print(f"Error con {core_dll}: {ce}")
                         
-                    win.after(0, lambda idx=i: progress.set(0.4 + (0.6 * ((idx + 1) / total_cores))))
+                    win.after(0, lambda idx=i: progress.set(0.4 + (0.6 * ((idx + 1) / (total_cores or 1)))))
                 
                 # 4. Finalizado
                 win.after(0, lambda: lbl.configure(text="¡Instalación completada exitosamente!", text_color=COLORS["green"]))
@@ -1978,13 +2271,43 @@ class ChvstxNexus(ctk.CTk):
 
         def step_retroarch():
             ctk.CTkLabel(main_container, text="🕹️ Emulación", font=("Courier New", 18, "bold"), text_color=COLORS["accent"]).pack(pady=(40, 10))
-            ctk.CTkLabel(main_container, text="Se recomienda instalar RetroArch automáticamente.", font=("Courier New", 11), text_color=COLORS["text_dim"]).pack(pady=(0, 30))
-            auto = ctk.CTkFrame(main_container, fg_color=COLORS["bg_card"], corner_radius=12, border_width=1, border_color=COLORS["border"])
-            auto.pack(fill="x", padx=40)
-            ctk.CTkLabel(auto, text="📥 Instalación Silenciosa", font=("Courier New", 13, "bold"), text_color=COLORS["green"]).pack(anchor="w", padx=20, pady=(15, 5))
-            def do_auto(): self._install_retroarch(tk.StringVar(), tk.StringVar(), lambda p: next_step(), win)
-            ctk.CTkButton(auto, text="Instalar Ahora", fg_color=COLORS["accent"], text_color=COLORS["bg_dark"], font=("Courier New", 11, "bold"), command=do_auto).pack(pady=(0, 15))
-            ctk.CTkButton(main_container, text="Configurar después", fg_color="transparent", text_color=COLORS["text_dim"], command=next_step).pack(pady=20)
+            
+            # Check for existing RetroArch installations in common paths
+            common_paths = [
+                r"C:\RetroArch-Win64\retroarch.exe",
+                r"C:\RetroArch\retroarch.exe",
+                os.path.join(os.environ.get("LOCALAPPDATA", ""), "RetroArch", "retroarch.exe"),
+                os.path.join(os.environ.get("APPDATA", ""), "RetroArch", "retroarch.exe")
+            ]
+            
+            found_path = None
+            for p in common_paths:
+                if os.path.exists(p):
+                    found_path = p
+                    break
+                    
+            if found_path:
+                # Mostrar banner de detección
+                f_detected = ctk.CTkFrame(main_container, fg_color=COLORS["bg_card"], corner_radius=12, border_width=1, border_color=COLORS["green"])
+                f_detected.pack(fill="x", padx=40, pady=(0, 20))
+                ctk.CTkLabel(f_detected, text="✨ Se ha detectado una instalación de RetroArch", font=("Courier New", 13, "bold"), text_color=COLORS["green"]).pack(pady=(15, 5))
+                ctk.CTkLabel(f_detected, text=found_path, font=("Courier New", 10), text_color=COLORS["text_dim"]).pack(pady=(0, 15))
+                
+                # Auto-configurar
+                self.config["retroarch_path"] = found_path
+                self.config["cores_dir"] = os.path.join(os.path.dirname(found_path), "cores")
+                
+                ctk.CTkLabel(main_container, text="Ya tienes todo listo para jugar. Puedes omitir la instalación automática.", font=("Courier New", 11), text_color=COLORS["text_bright"]).pack(pady=(0, 20))
+                ctk.CTkButton(main_container, text="Continuar →", fg_color=COLORS["accent"], text_color=COLORS["bg_dark"], font=("Courier New", 12, "bold"), command=next_step).pack(pady=10)
+                
+            else:
+                ctk.CTkLabel(main_container, text="Se recomienda instalar RetroArch automáticamente.", font=("Courier New", 11), text_color=COLORS["text_dim"]).pack(pady=(0, 30))
+                auto = ctk.CTkFrame(main_container, fg_color=COLORS["bg_card"], corner_radius=12, border_width=1, border_color=COLORS["border"])
+                auto.pack(fill="x", padx=40)
+                ctk.CTkLabel(auto, text="📥 Instalación Silenciosa", font=("Courier New", 13, "bold"), text_color=COLORS["green"]).pack(anchor="w", padx=20, pady=(15, 5))
+                def do_auto(): self._install_retroarch(tk.StringVar(), tk.StringVar(), lambda p: next_step(), win)
+                ctk.CTkButton(auto, text="Instalar Ahora", fg_color=COLORS["accent"], text_color=COLORS["bg_dark"], font=("Courier New", 11, "bold"), command=do_auto).pack(pady=(0, 15))
+                ctk.CTkButton(main_container, text="Configurar después", fg_color="transparent", text_color=COLORS["text_dim"], command=next_step).pack(pady=20)
 
         def step_achievements():
             ctk.CTkLabel(main_container, text="🏆 Logros", font=("Courier New", 18, "bold"), text_color=COLORS["accent"]).pack(pady=(40, 10))
@@ -2104,19 +2427,41 @@ class ChvstxNexus(ctk.CTk):
 
     # ════════ Configuración ══════════════════════════════════════════════
     def _open_settings(self):
-        win = ctk.CTkToplevel(self)
-        win.title("Configuración")
-        win.geometry("740x680")
-        win.configure(fg_color=COLORS["bg_dark"])
-        win.grab_set()
+        # We now use an inline frame instead of Toplevel
+        self.main_frame.grid_remove()
+        
+        # Ocultar botones topbar que no aplican a settings
+        for b in self.view_btns.values(): b.configure(state="disabled")
+        
+        # Limpiar frame anterior
+        for w in self.settings_frame_container.winfo_children(): w.destroy()
+        
+        
+        self.settings_frame_container.grid(row=0, column=0, sticky="nsew")
+        self.settings_frame_container.grid_rowconfigure(2, weight=1)
+        self.settings_frame_container.grid_columnconfigure(0, weight=1)
+        
+        top_bar = ctk.CTkFrame(self.settings_frame_container, fg_color="transparent")
+        top_bar.grid(row=0, column=0, sticky="ew", padx=30, pady=(20, 0))
+        
+        # Back button
+        def _close_settings():
+            self.settings_frame_container.grid_remove()
+            self.main_frame.grid(row=0, column=0, sticky="nsew")
+            for b in self.view_btns.values(): b.configure(state="normal")
+            
+        ctk.CTkButton(top_bar, text="◀ Volver", font=("Courier New",14,"bold"), width=100, height=36,
+                      fg_color=COLORS["bg_card"], hover_color=COLORS["bg_hover"], border_width=1, border_color=COLORS["border"],
+                      text_color=COLORS["text_bright"], command=_close_settings).pack(side="left")
 
-        ctk.CTkLabel(win, text="CONFIGURACIÓN", font=("Courier New",20,"bold"),
-                     text_color=COLORS["accent"]).pack(pady=(24,4))
-        ctk.CTkLabel(win, text="RetroArch y rutas de ROMs",
-                     font=("Courier New",11), text_color=COLORS["text_dim"]).pack(pady=(0,16))
+        ctk.CTkLabel(top_bar, text="CONFIGURACIÓN", font=("Courier New",20,"bold"),
+                     text_color=COLORS["accent"]).pack(side="right")
+        
+        ctk.CTkLabel(self.settings_frame_container, text="RetroArch y rutas de ROMs",
+                     font=("Courier New",11), text_color=COLORS["text_dim"]).grid(row=1, column=0, padx=30, pady=(4,16), sticky="e")
 
-        scroll = ctk.CTkScrollableFrame(win, fg_color=COLORS["bg_mid"])
-        scroll.pack(fill="both", expand=True, padx=20)
+        scroll = ctk.CTkScrollableFrame(self.settings_frame_container, fg_color=COLORS["bg_mid"])
+        scroll.grid(row=2, column=0, sticky="nsew", padx=20, pady=(0, 20))
 
         # ── RetroArch exe ──
         ctk.CTkLabel(scroll, text="🕹️  RetroArch",
@@ -2157,6 +2502,68 @@ class ChvstxNexus(ctk.CTk):
                       border_width=1, border_color=COLORS["border"],
                       command=browse_cores).pack(side="left")
 
+        # ── Gestor de Emuladores ──
+        ctk.CTkLabel(scroll, text="🎮  Gestor de Emuladores",
+                     font=("Courier New",13,"bold"), text_color=COLORS["accent"]
+        ).pack(anchor="w", padx=16, pady=(16,4))
+        
+        ctk.CTkLabel(scroll, text="Activa las consolas que deseas usar y elige tu core preferido para cada una.",
+                     font=("Courier New",10), text_color=COLORS["text_dim"], anchor="w"
+        ).pack(anchor="w", padx=16, pady=(0,12))
+
+        emulators_frame = ctk.CTkFrame(scroll, fg_color=COLORS["bg_card"], corner_radius=10,
+                                     border_width=1, border_color=COLORS["border"])
+        emulators_frame.pack(fill="x", padx=16, pady=(0,16))
+
+        # Local state for preferences
+        self._temp_active = list(self.config.get("active_consoles", []))
+        self._temp_prefs = dict(self.config.get("core_preferences", {}))
+        
+        # Guardamos las referencias de las UI para aplicar toggles/comboboxes al guardar
+        self._emu_switches = {}
+        self._emu_combos = {}
+
+        for cn, available_cores in RA_CORES.items():
+            if not available_cores: continue
+            
+            row = ctk.CTkFrame(emulators_frame, fg_color="transparent")
+            row.pack(fill="x", padx=12, pady=6)
+            
+            info = CONSOLES.get(cn, {})
+            
+            # Switch
+            is_active = cn in self._temp_active
+            switch_var = tk.BooleanVar(value=is_active)
+            sw = ctk.CTkSwitch(row, text=f"{info.get('emoji','')} {cn}",
+                               font=("Courier New",12,"bold"),
+                               text_color=info.get("color","#fff"),
+                               variable=switch_var, onvalue=True, offvalue=False,
+                               progress_color=COLORS["green"])
+            sw.pack(side="left", padx=(0, 20))
+            self._emu_switches[cn] = switch_var
+            
+            # Combo Box for Core Preference
+            default_core = self._temp_prefs.get(cn)
+            if not default_core or default_core not in available_cores:
+                default_core = available_cores[0]  # Fallback to first available
+                
+            combo_var = tk.StringVar(value=default_core)
+            combo = ctk.CTkComboBox(row, values=available_cores, variable=combo_var,
+                                    width=240, font=("Courier New",10),
+                                    dropdown_font=("Courier New",10),
+                                    dropdown_fg_color=COLORS["bg_card"],
+                                    dropdown_hover_color=COLORS["bg_hover"],
+                                    fg_color=COLORS["bg_dark"], border_color=COLORS["border"])
+            combo.pack(side="right")
+            self._emu_combos[cn] = combo_var
+            
+            # Helper logic to disable combo unselected
+            def _toggle_combo(var=switch_var, cb=combo):
+                cb.configure(state="normal" if var.get() else "disabled")
+            
+            sw.configure(command=_toggle_combo)
+            _toggle_combo(switch_var, combo)
+
         # ── Estado de cores ──
         ctk.CTkLabel(scroll, text="📦  Estado de cores instalados",
                      font=("Courier New",13,"bold"), text_color=COLORS["text_bright"]
@@ -2170,10 +2577,16 @@ class ChvstxNexus(ctk.CTk):
             for w in cores_status.winfo_children():
                 w.destroy()
             cd = cores_path or cores_var.get()
-            for cn, core_file in RA_CORES.items():
+            
+            for cn, available_cores in RA_CORES.items():
+                if not available_cores: continue
+                # Use the user's preferred core from the combo box if available, else first option
+                core_file = self._emu_combos[cn].get() if cn in self._emu_combos else available_cores[0]
+                
                 core_full = os.path.join(cd, core_file)
                 installed = os.path.exists(core_full)
                 info      = CONSOLES.get(cn, {})
+                
                 row = ctk.CTkFrame(cores_status, fg_color="transparent")
                 row.pack(fill="x", padx=12, pady=3)
                 ctk.CTkLabel(row, text=f"{info.get('emoji','')} {cn}",
@@ -2194,8 +2607,8 @@ class ChvstxNexus(ctk.CTk):
                       command=refresh_cores_status).pack(pady=12)
 
         # Línea de versión
-        version_f = ctk.CTkFrame(win, fg_color="transparent")
-        version_f.pack(side="bottom", fill="x", pady=10)
+        version_f = ctk.CTkFrame(self.settings_frame_container, fg_color="transparent")
+        version_f.grid(row=3, column=0, sticky="ew", pady=(0, 10))
         ctk.CTkLabel(version_f, text=f"{APP_NAME} v{CURRENT_VERSION}", 
                      font=("Courier New", 10), text_color=COLORS["text_dim"]).pack()
 
@@ -2212,7 +2625,7 @@ class ChvstxNexus(ctk.CTk):
                      anchor="w").pack(side="left")
         ctk.CTkButton(install_row, text="⬇ Instalar ahora", font=("Courier New",11,"bold"),
                       fg_color=COLORS["accent"], hover_color=COLORS["accent2"], height=30,
-                      command=lambda: self._install_retroarch(ra_var, cores_var, refresh_cores_status, win)
+                      command=lambda: self._install_retroarch(ra_var, cores_var, refresh_cores_status, self.settings_frame_container)
         ).pack(side="left", padx=20)
 
         # ── Carpeta ROMs ──
@@ -2284,14 +2697,76 @@ class ChvstxNexus(ctk.CTk):
             self.config["ra_apikey"]      = ra_apikey_var.get().strip()
             # Limpiar clave antigua si existía
             self.config.pop("emulators", None)
-            save_config(self.config)
-            win.destroy()
-            self._load_games()
-            self._set_status("✓  Configuración guardada")
+            
+            # Save Emulator Manager settings
+            new_active = []
+            new_prefs = {}
+            for cn, switch_var in self._emu_switches.items():
+                if switch_var.get():
+                    new_active.append(cn)
+                    
+            for cn, combo_var in self._emu_combos.items():
+                val = combo_var.get()
+                if val: new_prefs[cn] = val
+                
+            self.config["active_consoles"] = new_active
+            self.config["core_preferences"] = new_prefs
 
-        ctk.CTkButton(win, text="💾  Guardar configuración",
+            save_config(self.config)
+            
+            # Auto-download missing cores and create ROM folders for active consoles
+            cd = cores_var.get()
+            rd = roms_var.get()
+            if cd and rd and os.path.exists(cd) and os.path.exists(rd):
+                def download_missing_cores():
+                    for cn in new_active:
+                        # 1. Create ROM folder
+                        console_rom_dir = os.path.join(rd, cn)
+                        os.makedirs(console_rom_dir, exist_ok=True)
+                        
+                        # 2. Check and download preferred core
+                        pref_core = new_prefs.get(cn)
+                        if pref_core:
+                            target_file = os.path.join(cd, pref_core)
+                            if not os.path.exists(target_file):
+                                self.after(0, lambda c=cn: self._set_status(f"Descargando core para {c}..."))
+                                self._download_core(pref_core, target_file)
+                    
+                    self.after(0, lambda: self._set_status("✓  Cores listos. Configuración aplicada."))
+                    self.after(0, self._load_games)
+                    
+                threading.Thread(target=download_missing_cores, daemon=True).start()
+            else:
+                self._load_games()
+            
+            # Update root UI after save
+            
+            # Select fallback console if the old main view is not active anymore
+            if self.current_console and self.current_console not in new_active:
+                if new_active and new_active[0] in CONSOLES:
+                    self._select_console(new_active[0])
+                    
+            # Rebuild top bar items
+            for widget in self.categories_frame.winfo_children():
+                widget.destroy()
+            self.console_buttons = {}
+            for i, name in enumerate(new_active):
+                if name in CONSOLES:
+                    nfo = CONSOLES[name]
+                    b = ctk.CTkButton(self.categories_frame, text=f"{nfo['emoji']} {name}",
+                                      font=("Courier New",14,"bold"), fg_color="transparent",
+                                      hover_color=COLORS["bg_hover"], text_color=COLORS["text_dim"],
+                                      height=40, width=80, corner_radius=20,
+                                      command=lambda n=name: self._select_console(n))
+                    b.pack(side="left", padx=5, pady=5)
+                    self.console_buttons[name] = b
+            
+            _close_settings()
+            self._set_status("Aplicando configuración...")
+
+        ctk.CTkButton(self.settings_frame_container, text="💾  Guardar configuración",
                       font=("Courier New",13,"bold"), fg_color=COLORS["accent"],
-                      hover_color=COLORS["accent2"], height=44, command=save).pack(pady=16)
+                      hover_color=COLORS["accent2"], height=44, command=save).grid(row=4, column=0, pady=16)
 
 
 if __name__ == "__main__":

@@ -1,35 +1,34 @@
 # 🌌 Chvstx Nexus
 
-![Version](https://img.shields.io/badge/version-1.4.2-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-gold)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**Chvstx Nexus** es una interfaz unificada, moderna y profundamente personalizada para gestionar tu colección de juegos clásicos. Inspirada en la estética de *Kingdom Hearts*, ofrece una experiencia visual premium y altamente interactiva.
+**Chvstx Nexus** es una interfaz unificada, moderna y profundamente personalizada para gestionar tu colección de juegos clásicos. Con su nueva **Experiencia Nexus 2.0**, ofrece una navegación de élite inspirada en las consolas clásicas más premium.
 
 > [!TIP]
 > **¿Buscas la última versión ejecutable?** Descárgala directamente desde la sección de [Releases](https://github.com/DavidFR-2000/ChvstxNexux/releases/latest)
 
 ---
 
-## ✨ Novedades v1.3.0 (Mega Update)
+## 🚀 Novedades v2.0.0 (The Nexus Evolution)
 
-- **🚀 Instalador Automático**: Nexus ahora puede instalarse en tu PC, creando un acceso directo en el escritorio y gestionando archivos en `AppData`.
-- **🧱 Nuevo Onboarding de 6 Pasos**: Un asistente renovado que te guía desde la instalación hasta la configuración de RetroAchievements y carpetas.
-- **🗑️ Función de Desinstalación**: Borra todos tus datos (configuración, caché, accesos directos) de forma segura desde los ajustes.
-- **🖼️ Carátulas Reparadas**: Motor de búsqueda de portadas (Bing) actualizado para mayor fiabilidad.
-- **🔌 RetroArch One-Click**: Instalación silenciosa de RetroArch y núcleos optimizada.
-- **🛠️ Estabilidad Total**: Solucionados cierres inesperados al usar el modo portable y errores de interfaz.
+- **🎮 Interfaz Estilo PSP (XMB)**: Rediseño total de la navegación. Ahora con barra superior horizontal para consolas y lista vertical dinámica para juegos, con transiciones ultra fluidas.
+- **☁️ Hub de Descargas Myrient (R-Roms)**: Integración directa con el Megathread de R-Roms. Busca y descarga juegos de NES, GBA, PS1, GameCube y más de 15 consolas directamente desde la app.
+- **📚 Enciclopedia Wikipedia**: Nuevo sistema de descripciones de alta precisión. Nexus ahora consulta Wikipedia (Español e Inglés) para ofrecerte información real y detallada de cada juego en tu colección.
+- **⚙️ Ajustes Integrados**: Se acabó la ventana secundaria. Ahora la configuración vive dentro de la interfaz principal para una experiencia más coherente y fluida.
+- **📦 Descarga de Cores Automática**: Si te falta un núcleo de RetroArch para tu juego, Nexus lo reconoce y te permite descargarlo al momento sin salir del programa.
 
 ---
 
 ## 🌟 Características de Élite
 
-- **💙 Interfaz Nexus**: Diseño interactivo con efectos de cristal, iluminaciones dinámicas y transiciones fluidas.
-- **7 Consolas Soportadas**: SNES, GBA, NDS, PS1, PS2, Mega Drive y Saturn.
-- **Instalador de RetroArch Integrado**: Descarga e instala RetroArch y sus núcleos (cores) directamente desde la aplicación.
-- **Asistente de RetroAchievements**: Tutorial paso a paso para configurar y activar tus logros en juegos clásicos.
-- **Portadas Automáticas**: Descarga automática de carátulas con previsualizaciones de alta calidad.
-- **Modo Portable vs Estándar**: Elige guardar todo en la misma carpeta o en tu perfil de usuario.
+- **💙 Diseño Premium**: Estética moderna con efectos de cristal (glassmorphism), iluminaciones dinámicas y tipografía optimizada.
+- **+18 Sistemas Soportados**: Desde NES y Game Boy hasta PS2, Dreamcast y GameCube.
+- **Instalador de RetroArch Pro**: Gestión completa de la instalación y actualización de RetroArch y sus núcleos.
+- **Sincronización de Logros**: Soporte total para RetroAchievements con tutorial paso a paso.
+- **Portadas Inteligentes**: Motor dual de búsqueda de carátulas para que tu colección siempre luzca impecable.
+- **Modo Flexible**: Elige entre instalación estándar en el sistema o modo portable para llevar tu Nexus en un USB.
 
 ---
 
