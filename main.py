@@ -556,31 +556,42 @@ class ChvstxNexus(ctk.CTk):
         
         if not current_exe:
             messagebox.showinfo(APP_NAME, "Actualización descargada. Ejecútala manualmente desde:\n" + new_exe_path)
-            # Abrir carpeta del archivo
             subprocess.run(f'explorer /select,"{new_exe_path}"')
             return
 
-        # Script Batch para el intercambio de archivos (más robusto)
+        # Script Batch robusto para el intercambio de archivos
         bat_path = os.path.join(tempfile.gettempdir(), "nexus_updater.bat")
-        exe_name = os.path.basename(current_exe)
+        current_pid = os.getpid()
         with open(bat_path, "w") as f:
-            f.write(f"@echo off\n")
-            f.write(f"title Actualizando Chvstx Nexus...\n")
-            f.write(f"echo Esperando a que la aplicacion se cierre...\n")
-            f.write(f"timeout /t 3 /nobreak > nul\n")
-            f.write(f"taskkill /f /im {exe_name} > nul 2>&1\n") # Asegurar cierre
-            f.write(f":retry\n")
-            f.write(f'move /y "{new_exe_path}" "{current_exe}"\n')
-            f.write(f"if errorlevel 1 (\n")
-            f.write(f"  echo El archivo esta bloqueado, reintentando en 1 segundo...\n")
-            f.write(f"  timeout /t 1 /nobreak > nul\n")
-            f.write(f"  goto retry\n")
+            f.write("@echo off\n")
+            f.write("title Actualizando Chvstx Nexus...\n")
+            f.write("echo Esperando a que la aplicacion se cierre completamente...\n")
+            # Esperar a que el proceso actual termine completamente
+            f.write(f":wait_exit\n")
+            f.write(f'tasklist /FI "PID eq {current_pid}" 2>nul | find "{current_pid}" >nul\n')
+            f.write(f"if not errorlevel 1 (\n")
+            f.write(f"  ping 127.0.0.1 -n 2 >nul\n")
+            f.write(f"  goto wait_exit\n")
             f.write(f")\n")
+            # Esperar extra para que _MEI se libere
+            f.write("echo Proceso cerrado. Aplicando actualizacion...\n")
+            f.write("ping 127.0.0.1 -n 4 >nul\n")
+            # Intentar copiar el nuevo exe sobre el viejo
+            f.write(":retry\n")
+            f.write(f'copy /y "{new_exe_path}" "{current_exe}" >nul 2>&1\n')
+            f.write("if errorlevel 1 (\n")
+            f.write("  echo El archivo esta bloqueado, reintentando...\n")
+            f.write("  ping 127.0.0.1 -n 3 >nul\n")
+            f.write("  goto retry\n")
+            f.write(")\n")
+            # Borrar el temporal y arrancar
+            f.write(f'del /f /q "{new_exe_path}" >nul 2>&1\n')
+            f.write(f'echo Iniciando nueva version...\n')
             f.write(f'start "" "{current_exe}"\n')
-            f.write(f'del "%~f0"\n')
+            f.write('del "%~f0"\n')
 
         self._set_status("Reiniciando para aplicar la nueva versión de Nexus...")
-        subprocess.Popen([bat_path], shell=True)
+        subprocess.Popen(["cmd", "/c", bat_path], creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
         self.quit()
         sys.exit()
 
