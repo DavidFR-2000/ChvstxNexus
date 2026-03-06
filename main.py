@@ -17,7 +17,7 @@ from io import BytesIO
 import sys
 
 # ─── Configuración Global ────────────────────────────────────────────────────
-CURRENT_VERSION = "1.3.0"
+CURRENT_VERSION = "1.4.0"
 APP_NAME = "Chvstx Nexus"
 REPO_URL = "https://github.com/DavidFR-2000/ChvstxNexux"
 UPDATE_URL = "https://api.github.com/repos/DavidFR-2000/ChvstxNexux/releases/latest"
@@ -532,20 +532,53 @@ class ChvstxNexus(ctk.CTk):
 
     def _download_update_thread(self):
         try:
-            temp_dir = tempfile.gettempdir()
-            new_exe_path = os.path.join(temp_dir, "Nexus_Update.exe")
+            current_exe = sys.executable if getattr(sys, 'frozen', False) else None
+            
+            if current_exe:
+                # Descargar JUNTO al exe actual (mismo volumen = rename atómico)
+                exe_dir = os.path.dirname(os.path.abspath(current_exe))
+                new_exe_path = os.path.join(exe_dir, "ChvstxNexus_update.exe")
+            else:
+                new_exe_path = os.path.join(tempfile.gettempdir(), "ChvstxNexus_update.exe")
             
             self._set_status("Descargando actualización...")
-            r = requests.get(self.update_url_exe, stream=True, timeout=30)
+            r = requests.get(self.update_url_exe, stream=True, timeout=60)
             if r.status_code == 200:
+                total = int(r.headers.get('content-length', 0))
+                downloaded = 0
                 with open(new_exe_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192):
+                    for chunk in r.iter_content(chunk_size=65536):
                         if chunk:
                             f.write(chunk)
+                            downloaded += len(chunk)
+                            if total:
+                                pct = int(downloaded * 100 / total)
+                                self.after(0, lambda p=pct: self._set_status(f"Descargando actualización... {p}%"))
+                
+                # Verificar que el archivo descargado tiene un tamaño razonable (>1MB)
+                if os.path.getsize(new_exe_path) < 1_000_000:
+                    self.after(0, lambda: messagebox.showerror("Error", "El archivo descargado parece estar corrupto."))
+                    self.after(0, lambda: self.update_btn.configure(state="normal", text="🚀 Reintentar"))
+                    os.remove(new_exe_path)
+                    return
+                
+                # IMPORTANTE: Eliminar la marca "descargado de internet" (Zone.Identifier)
+                # Sin esto, Windows bloquea la extracción de DLLs del exe PyInstaller
+                try:
+                    os.remove(new_exe_path + ":Zone.Identifier")
+                except Exception:
+                    pass
+                try:
+                    subprocess.run(
+                        ["powershell", "-Command", f'Unblock-File -Path "{new_exe_path}"'],
+                        capture_output=True, timeout=10
+                    )
+                except Exception:
+                    pass
                 
                 self.after(0, lambda: self._apply_update_and_restart(new_exe_path))
             else:
-                self.after(0, lambda: messagebox.showerror("Error", "No se pudo descargar el archivo."))
+                self.after(0, lambda: messagebox.showerror("Error", f"No se pudo descargar el archivo (HTTP {r.status_code})."))
                 self.after(0, lambda: self.update_btn.configure(state="normal", text="🚀 Reintentar"))
         except Exception as e:
             self.after(0, lambda: messagebox.showerror("Error", f"Fallo en la descarga: {e}"))
@@ -559,39 +592,56 @@ class ChvstxNexus(ctk.CTk):
             subprocess.run(f'explorer /select,"{new_exe_path}"')
             return
 
-        # Script Batch robusto para el intercambio de archivos
         bat_path = os.path.join(tempfile.gettempdir(), "nexus_updater.bat")
         current_pid = os.getpid()
-        with open(bat_path, "w") as f:
+        
+        with open(bat_path, "w", encoding="ascii", errors="ignore") as f:
             f.write("@echo off\n")
             f.write("title Actualizando Chvstx Nexus...\n")
-            f.write("echo Esperando a que la aplicacion se cierre completamente...\n")
-            # Esperar a que el proceso actual termine completamente
-            f.write(f":wait_exit\n")
-            f.write(f'tasklist /FI "PID eq {current_pid}" 2>nul | find "{current_pid}" >nul\n')
-            f.write(f"if not errorlevel 1 (\n")
-            f.write(f"  ping 127.0.0.1 -n 2 >nul\n")
-            f.write(f"  goto wait_exit\n")
-            f.write(f")\n")
-            # Esperar extra para que _MEI se libere
-            f.write("echo Proceso cerrado. Aplicando actualizacion...\n")
-            f.write("ping 127.0.0.1 -n 4 >nul\n")
-            # Intentar copiar el nuevo exe sobre el viejo
-            f.write(":retry\n")
-            f.write(f'copy /y "{new_exe_path}" "{current_exe}" >nul 2>&1\n')
-            f.write("if errorlevel 1 (\n")
-            f.write("  echo El archivo esta bloqueado, reintentando...\n")
-            f.write("  ping 127.0.0.1 -n 3 >nul\n")
-            f.write("  goto retry\n")
+            f.write("echo.\n")
+            f.write("echo ========================================\n")
+            f.write("echo   Actualizando Chvstx Nexus...\n")
+            f.write("echo ========================================\n")
+            f.write("echo.\n")
+            f.write("echo Esperando a que la aplicacion se cierre...\n")
+            # Esperar a que el proceso actual termine
+            f.write(":wait_exit\n")
+            f.write(f'tasklist /FI "PID eq {current_pid}" 2>nul | find /i "{current_pid}" >nul\n')
+            f.write("if not errorlevel 1 (\n")
+            f.write("  timeout /t 1 /nobreak >nul\n")
+            f.write("  goto wait_exit\n")
             f.write(")\n")
-            # Borrar el temporal y arrancar
-            f.write(f'del /f /q "{new_exe_path}" >nul 2>&1\n')
-            f.write(f'echo Iniciando nueva version...\n')
+            # Esperar extra para que _MEI y handles se liberen
+            f.write("echo Proceso cerrado. Esperando a que Windows libere archivos...\n")
+            f.write("timeout /t 5 /nobreak >nul\n")
+            # Borrar el exe viejo
+            f.write(":del_old\n")
+            f.write(f'del /f /q "{current_exe}" >nul 2>&1\n')
+            f.write(f'if exist "{current_exe}" (\n')
+            f.write("  echo Archivo aun bloqueado, reintentando...\n")
+            f.write("  timeout /t 3 /nobreak >nul\n")
+            f.write("  goto del_old\n")
+            f.write(")\n")
+            # Renombrar el nuevo exe al nombre del viejo (atomico, mismo volumen)
+            f.write("echo Aplicando nueva version...\n")
+            f.write(f'move /y "{new_exe_path}" "{current_exe}"\n')
+            f.write("if errorlevel 1 (\n")
+            f.write("  echo ERROR al renombrar, reintentando...\n")
+            f.write("  timeout /t 2 /nobreak >nul\n")
+            f.write(f'  move /y "{new_exe_path}" "{current_exe}"\n')
+            f.write(")\n")
+            f.write("echo.\n")
+            f.write("echo Actualizacion completada!\n")
+            # Desbloquear el exe (quitar marca de internet)
+            f.write(f'powershell -Command "Unblock-File -Path \'{current_exe}\'" >nul 2>&1\n')
+            f.write("echo Iniciando nueva version...\n")
+            f.write("timeout /t 2 /nobreak >nul\n")
             f.write(f'start "" "{current_exe}"\n')
+            f.write("timeout /t 2 /nobreak >nul\n")
             f.write('del "%~f0"\n')
 
-        self._set_status("Reiniciando para aplicar la nueva versión de Nexus...")
-        subprocess.Popen(["cmd", "/c", bat_path], creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
+        self._set_status("Reiniciando para aplicar la nueva version...")
+        subprocess.Popen(f'cmd /c "{bat_path}"', creationflags=0x00000010)  # CREATE_NEW_CONSOLE
         self.quit()
         sys.exit()
 
