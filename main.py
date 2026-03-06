@@ -17,7 +17,7 @@ from io import BytesIO
 import sys
 
 # ─── Configuración Global ────────────────────────────────────────────────────
-CURRENT_VERSION = "1.4.0"
+CURRENT_VERSION = "1.4.1"
 APP_NAME = "Chvstx Nexus"
 REPO_URL = "https://github.com/DavidFR-2000/ChvstxNexux"
 UPDATE_URL = "https://api.github.com/repos/DavidFR-2000/ChvstxNexux/releases/latest"
@@ -215,6 +215,39 @@ def save_playtime(data):
 def sanitize_name(name):
     return "".join(c for c in name if c.isalnum() or c in " _-").strip()
 
+def clean_rom_name(filename):
+    """Limpia un nombre de ROM eliminando tags de región, versión, etc.
+    Ejemplo: 'Super Mario World (USA) (Rev 1) [!]' → 'Super Mario World'
+    """
+    name = os.path.splitext(filename)[0]
+    # Eliminar contenido entre paréntesis: (USA), (Europe), (Rev 1), (En,Fr), (v1.1), etc.
+    name = re.sub(r'\s*\([^)]*\)', '', name)
+    # Eliminar contenido entre corchetes: [!], [T+Spa], [h1], etc.
+    name = re.sub(r'\s*\[[^\]]*\]', '', name)
+    # Eliminar indicadores de disco: Disc 1, CD1, disk2, etc.
+    name = re.sub(r'\s*(?:Disc|CD|Disk)\s*\d+', '', name, flags=re.IGNORECASE)
+    # Eliminar versiones: v1.0, v2, Rev 1, etc.
+    name = re.sub(r'\s*v\d+[\.\d]*', '', name, flags=re.IGNORECASE)
+    # Limpiar guiones bajos y guiones múltiples
+    name = name.replace('_', ' ')
+    name = re.sub(r'\s*-\s*$', '', name)  # guión al final
+    name = re.sub(r'\s+', ' ', name).strip()
+    return name
+
+def _name_similarity(a, b):
+    """Calcula similitud simple entre dos nombres (0.0 - 1.0)."""
+    a = a.lower().strip()
+    b = b.lower().strip()
+    if a == b:
+        return 1.0
+    # Palabras en común
+    words_a = set(a.split())
+    words_b = set(b.split())
+    if not words_a or not words_b:
+        return 0.0
+    common = words_a & words_b
+    return len(common) / max(len(words_a), len(words_b))
+
 def _create_desktop_shortcut(target_exe):
     """Crea un acceso directo en el escritorio usando PowerShell."""
     try:
@@ -238,15 +271,17 @@ def _create_desktop_shortcut(target_exe):
 def get_cover_path(cache_dir, game_name):
     return os.path.join(cache_dir, f"{sanitize_name(game_name)}.jpg")
 
-def download_cover(game_name, cache_dir, platform_id=None):
+def download_cover(game_name, cache_dir, platform_id=None, console_name=""):
     cover_path = get_cover_path(cache_dir, game_name)
     if os.path.exists(cover_path):
         return cover_path
     os.makedirs(cache_dir, exist_ok=True)
-    query   = sanitize_name(game_name)
+    # Limpiar el nombre del ROM para obtener el nombre real del juego
+    clean_name = clean_rom_name(game_name)
+    query = sanitize_name(clean_name)
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"}
 
-    # Fuente 1: RAWG API
+    # Fuente 1: RAWG API (con verificación de similitud)
     try:
         url = (f"https://api.rawg.io/api/games?search={requests.utils.quote(query)}"
                f"&key={RAWG_API_KEY}&page_size=5")
@@ -254,31 +289,43 @@ def download_cover(game_name, cache_dir, platform_id=None):
             url += f"&platforms={platform_id}"
         r = requests.get(url, headers=headers, timeout=6)
         if r.status_code == 200:
-            for res in r.json().get("results", []):
+            results = r.json().get("results", [])
+            # Ordenar por similitud con el nombre buscado
+            scored = []
+            for res in results:
+                res_name = res.get("name", "")
+                sim = _name_similarity(clean_name, res_name)
+                if sim >= 0.4 and res.get("background_image"):
+                    scored.append((sim, res))
+            scored.sort(key=lambda x: x[0], reverse=True)
+            
+            for sim, res in scored:
                 img_url = res.get("background_image")
                 if img_url:
-                    img_r = requests.get(img_url, headers=headers, timeout=8)
-                    if img_r.status_code == 200:
-                        img = Image.open(BytesIO(img_r.content)).convert("RGB")
-                        img = img.resize((300, 200), Image.LANCZOS)
-                        img.save(cover_path, "JPEG")
-                        return cover_path
+                    try:
+                        img_r = requests.get(img_url, headers=headers, timeout=8)
+                        if img_r.status_code == 200:
+                            img = Image.open(BytesIO(img_r.content)).convert("RGB")
+                            img = img.resize((300, 200), Image.LANCZOS)
+                            img.save(cover_path, "JPEG")
+                            return cover_path
+                    except Exception:
+                        continue
     except Exception:
         pass
 
-    # Fuente 2: Bing Images
+    # Fuente 2: Bing Images (con nombre de consola para más precisión)
     try:
-        q = requests.utils.quote(f"{query} game cover art")
+        console_hint = f" {console_name}" if console_name else ""
+        q = requests.utils.quote(f"{query}{console_hint} game cover art box")
         r = requests.get(f"https://www.bing.com/images/search?q={q}&first=1",
                          headers=headers, timeout=7)
         if r.status_code == 200:
-            # Buscamos murl en los datos de imagen, manejando escape de comillas
             matches = re.findall(r'"murl":"(https?://[^"]+\.(?:jpg|jpeg|png))"', r.text)
             if not matches:
-                # Intento 2 con comillas escapadas comunes en HTML
                 matches = re.findall(r'&quot;murl&quot;:&quot;(https?://[^&]+\.(?:jpg|jpeg|png))&quot;', r.text)
             
-            for img_url in matches[:10]:
+            for img_url in matches[:5]:
                 try:
                     img_r = requests.get(img_url, headers=headers, timeout=6)
                     if img_r.status_code == 200 and len(img_r.content) > 5000:
@@ -1318,7 +1365,7 @@ class ChvstxNexus(ctk.CTk):
             platform_id = CONSOLES.get(cn,{}).get("rawg_platform")
             if not os.path.exists(cover_path):
                 self._set_status(f"Descargando portada: {name}...")
-                result = download_cover(name, cache_dir, platform_id)
+                result = download_cover(name, cache_dir, platform_id, console_name=cn)
             else:
                 result = cover_path
             if result and os.path.exists(result):
@@ -2122,6 +2169,16 @@ class ChvstxNexus(ctk.CTk):
                      placeholder_text="Tu API Key (retroachievements.org → Configuración → API Key)",
                      fg_color=COLORS["bg_card"], text_color=COLORS["text_bright"],
                      border_color=COLORS["border"], show="*").pack(side="left")
+                     
+        # Botón para el tutorial interactivo
+        ra_tutorial_row = ctk.CTkFrame(scroll, fg_color="transparent")
+        ra_tutorial_row.pack(fill="x", padx=16, pady=(0,16))
+        ctk.CTkLabel(ra_tutorial_row, text="¿Cómo funciona?", font=("Courier New",10),
+                     text_color=COLORS["text_dim"], width=110, anchor="w").pack(side="left")
+        ctk.CTkButton(ra_tutorial_row, text="❓ Ver Tutorial de Configuración de Logros", 
+                      font=("Courier New",11,"bold"), fg_color=COLORS["bg_hover"], 
+                      hover_color=COLORS["accent"], text_color=COLORS["accent"], height=30,
+                      command=self._show_achievements_assistant).pack(side="left")
 
         # ── Peligro ──
         ctk.CTkLabel(scroll, text="⚠️  Zona de Peligro", font=("Courier New",13,"bold"), text_color=COLORS["red"]).pack(anchor="w", padx=16, pady=(20,4))
