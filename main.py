@@ -17,7 +17,7 @@ from io import BytesIO
 import sys
 
 # ─── Configuración Global ────────────────────────────────────────────────────
-CURRENT_VERSION = "0.9.0"
+CURRENT_VERSION = "1.2.0"
 APP_NAME = "Chvstx Nexus"
 REPO_URL = "https://github.com/DavidFR-2000/ChvstxNexux"
 UPDATE_URL = "https://api.github.com/repos/DavidFR-2000/ChvstxNexux/releases/latest"
@@ -187,6 +187,13 @@ def load_config():
             pass
     return default
 
+def check_branding_migration(cfg):
+    """Fuerza el asistente de bienvenida si es la primera transición a Nexus."""
+    if "nexus_first_run" not in cfg:
+        cfg["nexus_first_run"] = True
+        return True
+    return cfg.get("first_run", True)
+
 def save_config(cfg):
     with open(CONFIG_FILE, "w") as f:
         json.dump(cfg, f, indent=2)
@@ -335,8 +342,8 @@ class RetroLauncher(ctk.CTk):
         self._build_ui()
         self._select_console(list(CONSOLES.keys())[0])
 
-        # Si es la primera vez, mostrar el asistente de bienvenida
-        if self.config.get("first_run", True):
+        # Si es la primera vez (o primera vez en Nexus), mostrar el asistente
+        if check_branding_migration(self.config):
             self.after(500, self._show_welcome_wizard)
         
         # Buscar actualizaciones en segundo plano
@@ -526,16 +533,26 @@ class RetroLauncher(ctk.CTk):
             subprocess.run(f'explorer /select,"{new_exe_path}"')
             return
 
-        # Script Batch para el intercambio de archivos
+        # Script Batch para el intercambio de archivos (más robusto)
         bat_path = os.path.join(tempfile.gettempdir(), "nexus_updater.bat")
+        exe_name = os.path.basename(current_exe)
         with open(bat_path, "w") as f:
             f.write(f"@echo off\n")
-            f.write(f"timeout /t 2 /nobreak > nul\n") # Esperar a que se cierre la app
+            f.write(f"title Actualizando Chvstx Nexus...\n")
+            f.write(f"echo Esperando a que la aplicacion se cierre...\n")
+            f.write(f"timeout /t 3 /nobreak > nul\n")
+            f.write(f"taskkill /f /im {exe_name} > nul 2>&1\n") # Asegurar cierre
+            f.write(f":retry\n")
             f.write(f'move /y "{new_exe_path}" "{current_exe}"\n')
+            f.write(f"if errorlevel 1 (\n")
+            f.write(f"  echo El archivo esta bloqueado, reintentando en 1 segundo...\n")
+            f.write(f"  timeout /t 1 /nobreak > nul\n")
+            f.write(f"  goto retry\n")
+            f.write(f")\n")
             f.write(f'start "" "{current_exe}"\n')
-            f.write(f'del "%~f0"\n') # Borrar el propio .bat
+            f.write(f'del "%~f0"\n')
 
-        self._set_status("Reiniciando para aplicar actualización...")
+        self._set_status("Reiniciando para aplicar la nueva versión de Nexus...")
         subprocess.Popen([bat_path], shell=True)
         self.quit()
         sys.exit()
@@ -1324,7 +1341,7 @@ class RetroLauncher(ctk.CTk):
             console = console_var.get()
             query   = search_var.get().strip().lower()
             repo    = HB_REPOS[console]
-            headers = {"User-Agent": "RetroLauncher/1.0",
+            headers = {"User-Agent": f"{APP_NAME}/1.0",
                        "Accept": "application/vnd.github+json"}
 
             set_status(f"⏳ Buscando en {console}...")
@@ -1687,7 +1704,7 @@ class RetroLauncher(ctk.CTk):
 
     def _show_welcome_wizard(self):
         win = ctk.CTkToplevel(self)
-        win.title("👋 Bienvenido a RetroLauncher")
+        win.title(f"👋 Bienvenido a {APP_NAME}")
         win.geometry("680x620")
         win.configure(fg_color=COLORS["bg_dark"])
         win.attributes("-topmost", True)
@@ -1709,7 +1726,7 @@ class RetroLauncher(ctk.CTk):
             main = ctk.CTkFrame(content_f, fg_color="transparent")
             main.pack(fill="both", expand=True, padx=40, pady=30)
 
-            ctk.CTkLabel(main, text="¿Cómo quieres usar RetroLauncher?", 
+            ctk.CTkLabel(main, text=f"¿Cómo quieres usar {APP_NAME}?", 
                          font=("Courier New", 14, "bold"), text_color=COLORS["text_bright"]).pack(pady=(0, 20))
 
             # Standard Mode
@@ -1735,8 +1752,10 @@ class RetroLauncher(ctk.CTk):
                         try:
                             shutil.copy2(old_conf, CONFIG_FILE)
                         except: pass
-                    messagebox.showinfo("Modo Portable", "Se ha activado el modo portable. RetroLauncher ahora guardará todo en su propia carpeta.")
-                    show_intro()
+                    messagebox.showinfo("Modo Portable", f"Se ha activado el modo portable. {APP_NAME} ahora guardará todo en su propia carpeta.\n\nLa aplicación se reiniciará para aplicar los cambios.")
+                    # Reiniciar app para que CONFIG_DIR cambie
+                    python = sys.executable
+                    os.execl(python, python, *sys.argv)
                 except Exception as e:
                     messagebox.showerror("Error", f"No se pudo crear el archivo portable_mode.txt: {e}")
 
@@ -1746,13 +1765,13 @@ class RetroLauncher(ctk.CTk):
             clear_content()
             header = ctk.CTkFrame(content_f, fg_color=COLORS["bg_mid"], height=100, corner_radius=0)
             header.pack(fill="x", side="top")
-            ctk.CTkLabel(header, text="✨ BIENVENIDO A RETROLAUNCHER", 
+            ctk.CTkLabel(header, text=f"✨ BIENVENIDO A {APP_NAME.upper()}", 
                          font=("Courier New", 22, "bold"), text_color=COLORS["accent"]).pack(pady=25)
 
             main = ctk.CTkScrollableFrame(content_f, fg_color="transparent")
             main.pack(fill="both", expand=True, padx=30, pady=20)
 
-            ctk.CTkLabel(main, text="RetroLauncher es tu centro de emulación todo-en-uno.", 
+            ctk.CTkLabel(main, text=f"{APP_NAME} es tu centro de emulación todo-en-uno.", 
                          font=("Courier New", 12), text_color=COLORS["text_bright"], wraplength=550, justify="left").pack(pady=(0, 20))
 
             features = [
@@ -1771,6 +1790,7 @@ class RetroLauncher(ctk.CTk):
 
             def finish():
                 self.config["first_run"] = False
+                self.config["nexus_first_run"] = False
                 save_config(self.config)
                 win.destroy()
                 if messagebox.askyesno("Configuración inicial", "¿Deseas ir ahora a los ajustes para configurar tus carpetas de juegos?", parent=self):
@@ -1799,7 +1819,7 @@ class RetroLauncher(ctk.CTk):
         
         steps = [
             ("1. Crea una cuenta", "Ve a retroachievements.org y regístrate si no tienes cuenta."),
-            ("2. Abre RetroArch", "Inicia RetroArch desde el botón 'Lanzar' en RetroLauncher."),
+            ("2. Abre RetroArch", f"Inicia RetroArch desde el botón 'Lanzar' en {APP_NAME}."),
             ("3. Menú de Ajustes", "En el menú principal de RetroArch, ve a 'Ajustes' (Settings)."),
             ("4. Apartado Logros", "Busca la opción 'Logros' (Achievements) dentro de Ajustes."),
             ("5. Activar y Login", "Cambia 'Logros' a 'ON' e introduce tu Usuario y Contraseña."),
