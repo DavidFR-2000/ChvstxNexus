@@ -17,7 +17,7 @@ from io import BytesIO
 import sys
 
 # ─── Configuración Global ────────────────────────────────────────────────────
-CURRENT_VERSION = "1.4.2"
+CURRENT_VERSION = "1.4.3"
 APP_NAME = "Chvstx Nexus"
 REPO_URL = "https://github.com/DavidFR-2000/ChvstxNexux"
 UPDATE_URL = "https://api.github.com/repos/DavidFR-2000/ChvstxNexux/releases/latest"
@@ -627,6 +627,8 @@ class ChvstxNexus(ctk.CTk):
             else:
                 self.after(0, lambda: messagebox.showerror("Error", f"No se pudo descargar el archivo (HTTP {r.status_code})."))
                 self.after(0, lambda: self.update_btn.configure(state="normal", text="🚀 Reintentar"))
+        except SystemExit:
+            pass  # Expected when restarting
         except Exception as e:
             self.after(0, lambda: messagebox.showerror("Error", f"Fallo en la descarga: {e}"))
             self.after(0, lambda: self.update_btn.configure(state="normal", text="🚀 Reintentar"))
@@ -1926,7 +1928,12 @@ class ChvstxNexus(ctk.CTk):
             path_var = tk.StringVar(value=def_path)
             row = ctk.CTkFrame(std, fg_color="transparent"); row.pack(fill="x", padx=20, pady=(0, 15))
             ctk.CTkEntry(row, textvariable=path_var, font=("Courier New", 10), height=30).pack(side="left", fill="x", expand=True, padx=(0, 10))
-            ctk.CTkButton(row, text="...", width=40, command=lambda: path_var.set(filedialog.askdirectory() or path_var.get())).pack(side="right")
+            def choose_dir():
+                win.attributes("-topmost", False)
+                res = filedialog.askdirectory()
+                win.attributes("-topmost", True)
+                if res: path_var.set(res)
+            ctk.CTkButton(row, text="...", width=40, command=choose_dir).pack(side="right")
             def do_std():
                 try:
                     target = path_var.get(); os.makedirs(target, exist_ok=True)
@@ -1960,7 +1967,12 @@ class ChvstxNexus(ctk.CTk):
             ctk.CTkLabel(f, text="¿Dónde guardas tus ROMs?", font=("Courier New", 12, "bold")).pack(anchor="w")
             r = ctk.CTkFrame(f, fg_color="transparent"); r.pack(fill="x", pady=(5, 15))
             ctk.CTkEntry(r, textvariable=rom_v, font=("Courier New", 10)).pack(side="left", fill="x", expand=True, padx=(0, 10))
-            ctk.CTkButton(r, text="...", width=40, command=lambda: rom_v.set(filedialog.askdirectory() or rom_v.get())).pack(side="right")
+            def choose_rom_dir():
+                win.attributes("-topmost", False)
+                res = filedialog.askdirectory()
+                win.attributes("-topmost", True)
+                if res: rom_v.set(res)
+            ctk.CTkButton(r, text="...", width=40, command=choose_rom_dir).pack(side="right")
             def save(): self.config["roms_dir"] = rom_v.get(); next_step()
             ctk.CTkButton(main_container, text="Siguiente →", fg_color=COLORS["accent"], text_color=COLORS["bg_dark"], font=("Courier New", 12, "bold"), command=save).pack(pady=30)
 
@@ -2030,6 +2042,65 @@ class ChvstxNexus(ctk.CTk):
             self.quit()
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un error durante la desinstalación: {e}")
+
+    def _show_achievements_assistant(self):
+        win = ctk.CTkToplevel(self)
+        win.title("🏆 Asistente de Logros (RetroAchievements)")
+        win.geometry("600x500")
+        win.configure(fg_color=COLORS["bg_dark"])
+        win.attributes("-topmost", True)
+        
+        # Header
+        header = ctk.CTkFrame(win, fg_color=COLORS["bg_mid"], height=70, corner_radius=0)
+        header.pack(fill="x", side="top")
+        ctk.CTkLabel(header, text="🌟 CONFIGURAR LOGROS", font=("Courier New", 18, "bold"), text_color=COLORS["accent"]).pack(pady=20)
+        
+        main_frame = ctk.CTkScrollableFrame(win, fg_color="transparent")
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        steps = [
+            ("1. Crea una cuenta", "Ve a retroachievements.org y regístrate si no tienes cuenta."),
+            ("2. Abre RetroArch", f"Inicia RetroArch desde el botón 'Lanzar' en {APP_NAME}."),
+            ("3. Menú de Ajustes", "En el menú principal de RetroArch, ve a 'Ajustes' (Settings)."),
+            ("4. Apartado Logros", "Busca la opción 'Logros' (Achievements) dentro de Ajustes."),
+            ("5. Activar y Login", "Cambia 'Logros' a 'ON' e introduce tu Usuario y Contraseña."),
+            ("6. ¡Listo!", "Los logros aparecerán automáticamente al cargar juegos compatibles.")
+        ]
+        
+        for i, (title, desc) in enumerate(steps):
+            step_f = ctk.CTkFrame(main_frame, fg_color=COLORS["bg_card"], corner_radius=8)
+            step_f.pack(fill="x", pady=5, padx=5)
+            
+            ctk.CTkLabel(step_f, text=title, font=("Courier New", 13, "bold"), text_color=COLORS["yellow"]).pack(anchor="w", padx=15, pady=(10, 2))
+            ctk.CTkLabel(step_f, text=desc, font=("Courier New", 11), text_color=COLORS["text_bright"], wraplength=500, justify="left").pack(anchor="w", padx=15, pady=(0, 10))
+
+        # Footer Actions
+        footer = ctk.CTkFrame(win, fg_color=COLORS["bg_mid"], height=80, corner_radius=0)
+        footer.pack(fill="x", side="bottom")
+        
+        def open_web():
+            import webbrowser
+            webbrowser.open("https://retroachievements.org/createaccount.php")
+            
+        def launch_ra():
+            ra_path = self.config.get("retroarch_path", "")
+            if ra_path and os.path.exists(ra_path):
+                try:
+                    subprocess.Popen([ra_path])
+                except Exception as e:
+                    messagebox.showerror("Error", f"No se pudo lanzar RetroArch: {e}")
+            else:
+                messagebox.showwarning("RetroArch no encontrado", "Primero configura la ruta de RetroArch en Ajustes.")
+
+        ctk.CTkButton(footer, text="🌐 Crear cuenta", fg_color=COLORS["bg_hover"], hover_color=COLORS["bg_card"], 
+                      border_width=1, border_color=COLORS["border"],
+                      command=open_web, font=("Courier New", 11, "bold")).pack(side="left", padx=10, pady=20)
+                      
+        ctk.CTkButton(footer, text="🎮 Lanzar RetroArch", fg_color=COLORS["accent"], hover_color=COLORS["accent2"], 
+                      command=launch_ra, font=("Courier New", 12, "bold")).pack(side="left", padx=10, pady=20)
+                      
+        ctk.CTkButton(footer, text="Entendido", fg_color=COLORS["bg_hover"], border_width=1, border_color=COLORS["border"],
+                      command=win.destroy, font=("Courier New", 12, "bold")).pack(side="right", padx=10, pady=20)
 
     # ════════ Configuración ══════════════════════════════════════════════
     def _open_settings(self):
