@@ -19,7 +19,7 @@ import difflib
 import unicodedata
 
 # ─── Configuración Global ────────────────────────────────────────────────────
-CURRENT_VERSION = "2.0.2"
+CURRENT_VERSION = "2.0.3"
 APP_NAME = "Chvstx Nexus"
 REPO_URL = "https://github.com/DavidFR-2000/ChvstxNexux"
 UPDATE_URL = "https://api.github.com/repos/DavidFR-2000/ChvstxNexux/releases/latest"
@@ -825,14 +825,18 @@ class ChvstxNexus(ctk.CTk):
             f.write("timeout /t 2 /nobreak >nul\n")
             f.write('del "%~f0"\n')
 
+        vbs_path = os.path.join(tempfile.gettempdir(), "nexus_updater_launcher.vbs")
+        with open(vbs_path, "w", encoding="ascii") as f:
+            f.write('Set WshShell = CreateObject("WScript.Shell")\n')
+            f.write(f'WshShell.Run chr(34) & "{bat_path}" & chr(34), 0, False\n')
+            f.write('Set objFSO = CreateObject("Scripting.FileSystemObject")\n')
+            f.write(f'objFSO.DeleteFile("{vbs_path}")\n')
+
         self._set_status("Reiniciando para aplicar la nueva version...")
-        env = os.environ.copy()
-        env.pop("_MEIPASS2", None)
-        env.pop("_MEIPASS", None)
-        subprocess.Popen(f'cmd /c "{bat_path}"', env=env, creationflags=0x00000010)  # CREATE_NEW_CONSOLE
+        # 0x00000008 is DETACHED_PROCESS to fully break from parent console
+        subprocess.Popen(["wscript", vbs_path], creationflags=0x00000008)
         self.quit()
         sys.exit()
-
     # ════════ Vistas ════════════════════════════════════════════════════
     def _set_view(self, view):
         self.current_view = view
