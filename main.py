@@ -818,13 +818,18 @@ class ChvstxNexus(ctk.CTk):
             # Desbloquear el exe (quitar marca de internet)
             f.write(f'powershell -Command "Unblock-File -Path \'{current_exe}\'" >nul 2>&1\n')
             f.write("echo Iniciando nueva version...\n")
+            f.write("set _MEIPASS2=\n")
+            f.write("set _MEIPASS=\n")
             f.write("timeout /t 2 /nobreak >nul\n")
             f.write(f'start "" "{current_exe}"\n')
             f.write("timeout /t 2 /nobreak >nul\n")
             f.write('del "%~f0"\n')
 
         self._set_status("Reiniciando para aplicar la nueva version...")
-        subprocess.Popen(f'cmd /c "{bat_path}"', creationflags=0x00000010)  # CREATE_NEW_CONSOLE
+        env = os.environ.copy()
+        env.pop("_MEIPASS2", None)
+        env.pop("_MEIPASS", None)
+        subprocess.Popen(f'cmd /c "{bat_path}"', env=env, creationflags=0x00000010)  # CREATE_NEW_CONSOLE
         self.quit()
         sys.exit()
 
