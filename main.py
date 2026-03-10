@@ -19,7 +19,7 @@ import difflib
 import unicodedata
 
 # ─── Configuración Global ────────────────────────────────────────────────────
-CURRENT_VERSION = "2.0.0"
+CURRENT_VERSION = "2.0.1"
 APP_NAME = "Chvstx Nexus"
 REPO_URL = "https://github.com/DavidFR-2000/ChvstxNexux"
 UPDATE_URL = "https://api.github.com/repos/DavidFR-2000/ChvstxNexux/releases/latest"
@@ -544,7 +544,7 @@ class ChvstxNexus(ctk.CTk):
         self._build_main()
 
     def _build_top_nav(self):
-        nav = ctk.CTkFrame(self, height=60, corner_radius=0,
+        nav = ctk.CTkFrame(self, height=75, corner_radius=0,
                            fg_color=COLORS["bg_mid"],
                            border_width=1, border_color=COLORS["border"])
         nav.grid(row=0, column=0, sticky="ew")
@@ -559,10 +559,10 @@ class ChvstxNexus(ctk.CTk):
 
         # 2. XMB Categories (Centro - Scrollable horizontal o Frame normal si caben)
         self.categories_frame = ctk.CTkScrollableFrame(nav, orientation="horizontal", 
-                                                       fg_color="transparent", height=60)
+                                                       fg_color="transparent", height=75,
+                                                       scrollbar_button_color=COLORS["border"],
+                                                       scrollbar_button_hover_color=COLORS["accent"])
         self.categories_frame.pack(side="left", fill="both", expand=True, padx=20)
-        # Fix the scrollbar taking space in horizontal mode slightly
-        self.categories_frame._scrollbar.grid_remove() 
         
         self.console_buttons = {}
         active = self.config.get("active_consoles", [])
@@ -1719,7 +1719,7 @@ class ChvstxNexus(ctk.CTk):
                     seen_urls = set()
                     for node in nodes:
                         href = node['href']
-                        if href == '/roms/mame' or href == '/roms/snes' or href == '/roms/ps-1' or href == '/roms/nds': continue # ignore console links
+                        if len(href.split('/')) <= 3: continue # ignore console links like /roms/gba
                         if href in seen_urls: continue
                         
                         text = node.text.strip()
