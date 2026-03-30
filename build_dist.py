@@ -22,10 +22,13 @@ def update_readme_version(version):
         print(f"✅ README.md actualizado a la versión {version}")
 
 def get_current_version():
-    with open("main.py", "r", encoding="utf-8") as f:
+    target_file = os.path.join("core", "config.py")
+    if not os.path.exists(target_file):
+        return "2.0.0"
+    with open(target_file, "r", encoding="utf-8") as f:
         content = f.read()
     match = re.search(r'CURRENT_VERSION\s*=\s*"([^"]+)"', content)
-    return match.group(1) if match else "1.0.0"
+    return match.group(1) if match else "2.0.0"
 
 def build():
     print(f"🚀 Iniciando proceso de empaquetado de {APP_NAME}...")
@@ -48,6 +51,11 @@ def build():
         "--noconsole",
         "--onefile",
         "--clean",
+        "--hidden-import=py7zr",
+        "--hidden-import=rarfile",
+        "--hidden-import=cloudscraper",
+        "--hidden-import=bs4",
+        "--hidden-import=requests",
         f"--name=ChvstxNexus_v{version}",
         "main.py"
     ]

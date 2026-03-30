@@ -1,6 +1,6 @@
 # 🌌 Chvstx Nexus
 
-![Version](https://img.shields.io/badge/version-2.0.0-gold)
+![Version](https://img.shields.io/badge/version-3.0.0-gold)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -11,13 +11,14 @@
 
 ---
 
-## 🚀 Novedades v2.0.0 (The Nexus Evolution)
+## 🚀 Novedades v3.0.0 (The Nexus PySide6 Engine)
 
-- **🎮 Interfaz Estilo PSP (XMB)**: Rediseño total de la navegación. Ahora con barra superior horizontal para consolas y lista vertical dinámica para juegos, con transiciones ultra fluidas.
-- **☁️ Hub de Descargas Myrient (R-Roms)**: Integración directa con el Megathread de R-Roms. Busca y descarga juegos de NES, GBA, PS1, GameCube y más de 15 consolas directamente desde la app.
-- **📚 Enciclopedia Wikipedia**: Nuevo sistema de descripciones de alta precisión. Nexus ahora consulta Wikipedia (Español e Inglés) para ofrecerte información real y detallada de cada juego en tu colección.
-- **⚙️ Ajustes Integrados**: Se acabó la ventana secundaria. Ahora la configuración vive dentro de la interfaz principal para una experiencia más coherente y fluida.
-- **📦 Descarga de Cores Automática**: Si te falta un núcleo de RetroArch para tu juego, Nexus lo reconoce y te permite descargarlo al momento sin salir del programa.
+- **⚡ Motor PySide6**: Reescritura completa del código nativo en C++/Qt para ofrecer un rendimiento masivo, fluidez a 60FPS y tiempos de carga instantáneos frente a CustomTkinter.
+- **🎮 Interfaz Ultra-Fluida**: Rediseño total de la navegación. Ahora con layouts dinámicos y la nueva vista en cuadrícula de gran resolución.
+- **☁️ Hub de Descargas Inteligente**: Integración directa con repositorios como Retrostic, Myrient y Homebrew para descargar juegos y ROMs limpiamente.
+- **📦 Auto-Extracción de ROMs**: El nuevo sistema descomprime automáticamente `.zip`, `.7z` y `.rar` detectando qué consolas (como PS2 o GameCube) necesitan la ISO directamente.
+- **📂 Escaneo de Subcarpetas**: Lee juegos en cualquier nivel de profundidad de carpetas.
+- **📚 Enciclopedia y Ajustes Dinámicos**: Integración con Wikipedia, API REST, Ajustes in-app con detector de Cores faltantes en RetroArch, y mucho más.
 
 ---
 
@@ -59,4 +60,4 @@ Este script actualizará la versión y generará el ejecutable `ChvstxNexus_vX.X
 
 ## 🤝 Créditos
 Desarrollado con ❤️ por **Chvstx**.
-Inspirado por el arte de Kingdom Hearts y el poder de **CustomTkinter**.
+Inspirado por el amor a lo retro y potenciado por el motor gráfico de **PySide6 / Qt**.

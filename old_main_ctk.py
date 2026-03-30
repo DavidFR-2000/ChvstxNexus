@@ -1,16 +1,9 @@
 import sys
-import os
 from PySide6.QtWidgets import QApplication
-from ui.theme import get_stylesheet
 from ui.main_window import MainWindow
 
 if __name__ == "__main__":
-    os.environ["QT_QUICK_CONTROLS_STYLE"] = "Basic"
     app = QApplication(sys.argv)
-    
-    # Apply dark theme
-    app.setStyleSheet(get_stylesheet())
-    
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
