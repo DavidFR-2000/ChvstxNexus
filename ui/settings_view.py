@@ -242,11 +242,29 @@ class SettingsView(QWidget):
     def build_danger_section(self):
         card, layout = self._create_section_card("Zona de Peligro", "⚠️")
         
-        btn = QPushButton("Restablecer de Fábrica (Borrar Configuración)")
+        btn = QPushButton("Desinstalar Aplicación")
         btn.setStyleSheet(f"background-color: transparent; border: 2px solid {COLORS['red']}; color: {COLORS['red']}; padding: 12px; border-radius: 8px; font-weight: bold;")
+        btn.clicked.connect(self.uninstall_app)
         layout.addWidget(btn)
         
         self.v_layout.addWidget(card)
+
+    def uninstall_app(self):
+        import sys, os, subprocess
+        from PySide6.QtWidgets import QApplication
+        
+        reply = QMessageBox.warning(self, "Desinstalar Chvstx Nexus", 
+            "¿Estás seguro de que quieres desinstalar la aplicación de tu PC?\n\nAl confirmar se cerrará el programa y se abrirá el desinstalador oficial.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            
+        if reply == QMessageBox.StandardButton.Yes:
+            base_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
+            uninstaller = os.path.join(base_dir, "unins000.exe")
+            if os.path.exists(uninstaller):
+                subprocess.Popen([uninstaller])
+                QApplication.quit()
+            else:
+                QMessageBox.critical(self, "Error", "No se ha encontrado el desinstalador en el directorio base.\nLa aplicación no fue instalada correctamente o estás usando la versión portable.")
 
     def save(self):
         self.config["retroarch_path"] = self.ra_path.text()

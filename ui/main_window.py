@@ -43,6 +43,8 @@ class MainWindow(QMainWindow):
         self.main_layout.addWidget(self.content_stack, 1)
         
         self.current_view_widget = None
+        self.active_downloads = []
+        self._build_downloads_panel()
         
         active = self.config.get("active_consoles", [])
         if active and active[0] in CONSOLES:
@@ -351,3 +353,141 @@ class MainWindow(QMainWindow):
             threading.Thread(target=monitor, args=(proc,), daemon=True).start()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error al lanzar RetroArch:\n{e}")
+
+    def _build_downloads_panel(self):
+        self.dl_panel = QWidget()
+        self.dl_panel.setFixedHeight(250)
+        self.dl_panel.setStyleSheet(f"border-top: 2px solid {COLORS['border']}; background-color: {COLORS['bg_mid']};")
+        
+        lay = QVBoxLayout(self.dl_panel)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        
+        header = QWidget()
+        header.setFixedHeight(30)
+        header.setStyleSheet(f"background-color: {COLORS['bg_card']}; border: none;")
+        h_lay = QHBoxLayout(header)
+        h_lay.setContentsMargins(15, 0, 15, 0)
+        title = QLabel("📥 GESTOR DE DESCARGAS")
+        title.setStyleSheet(f"font-weight: bold; font-size: 11px; color: {COLORS['accent2']};")
+        h_lay.addWidget(title)
+        
+        close_btn = QPushButton("Ocultar")
+        close_btn.setStyleSheet(f"color: {COLORS['text_dim']}; border: none; font-size: 11px;")
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.clicked.connect(self.dl_panel.hide)
+        h_lay.addWidget(close_btn)
+        
+        lay.addWidget(header)
+        
+        self.dl_scroll = QScrollArea()
+        self.dl_scroll.setWidgetResizable(True)
+        self.dl_scroll.setStyleSheet("border: none; background: transparent;")
+        
+        self.dl_container = QWidget()
+        self.dl_container.setStyleSheet("background: transparent;")
+        self.dl_layout = QVBoxLayout(self.dl_container)
+        self.dl_layout.setContentsMargins(15, 15, 15, 15)
+        self.dl_layout.setSpacing(10)
+        self.dl_layout.addStretch()
+        
+        self.dl_scroll.setWidget(self.dl_container)
+        lay.addWidget(self.dl_scroll)
+        
+        self.main_layout.addWidget(self.dl_panel)
+        self.dl_panel.hide()
+
+    def _create_transfer_row(self, title, dest_console, worker):
+        import PySide6.QtWidgets as QtWidgets
+        row = QtWidgets.QFrame()
+        row.setStyleSheet(f"background-color: {COLORS['bg_dark']}; border: 1px solid {COLORS['border']}; border-radius: 8px;")
+        row.setFixedHeight(75)
+        
+        layout = QtWidgets.QHBoxLayout(row)
+        layout.setContentsMargins(15, 10, 15, 10)
+        
+        info_lay = QtWidgets.QVBoxLayout()
+        name_lbl = QtWidgets.QLabel(f"{title}")
+        name_lbl.setStyleSheet(f"font-weight: bold; font-size: 13px; color: {COLORS['text_bright']}; border: none;")
+        
+        status_lbl = QtWidgets.QLabel(f"Preparando descarga a {dest_console}...")
+        status_lbl.setStyleSheet(f"font-size: 11px; color: {COLORS['text_dim']}; border: none;")
+        
+        info_lay.addWidget(name_lbl)
+        info_lay.addWidget(status_lbl)
+        info_lay.addStretch()
+        layout.addLayout(info_lay, stretch=3)
+        
+        prog_lay = QtWidgets.QVBoxLayout()
+        from PySide6.QtWidgets import QProgressBar
+        p_bar = QProgressBar()
+        p_bar.setFixedHeight(8)
+        p_bar.setTextVisible(False)
+        p_bar.setStyleSheet(f"QProgressBar {{ background-color: {COLORS['bg_mid']}; border: none; border-radius: 4px; }} QProgressBar::chunk {{ background-color: {COLORS['accent']}; border-radius: 4px; }}")
+        
+        speed_lbl = QtWidgets.QLabel("0.0 B/s")
+        speed_lbl.setStyleSheet(f"font-size: 11px; color: {COLORS['accent2']}; border: none; font-weight: bold;")
+        speed_lbl.setAlignment(Qt.AlignRight)
+        
+        prog_lay.addStretch()
+        prog_lay.addWidget(p_bar)
+        prog_lay.addWidget(speed_lbl)
+        prog_lay.addStretch()
+        layout.addLayout(prog_lay, stretch=2)
+        
+        layout.addSpacing(10)
+        cancel_btn = QPushButton("✕")
+        cancel_btn.setFixedSize(30, 30)
+        cancel_btn.setStyleSheet(f"QPushButton {{ background-color: transparent; border: 1px solid {COLORS['border']}; color: {COLORS['text_dim']}; font-weight: bold; font-size: 14px; border-radius: 15px; }} QPushButton:hover {{ background-color: {COLORS['bg_hover']}; color: {COLORS['red']}; border-color: {COLORS['red']}; }}")
+        cancel_btn.setCursor(Qt.PointingHandCursor)
+        cancel_btn.clicked.connect(lambda: getattr(worker, 'cancel')())
+        layout.addWidget(cancel_btn)
+        
+        return row, name_lbl, status_lbl, p_bar, speed_lbl, cancel_btn
+
+    def start_download(self, url, dest_dir, title, repo, exts, dest_console):
+        from ui.workers import HubDownloadWorker
+        worker = HubDownloadWorker(url, dest_dir, title, repo, exts)
+        row_widget, name_lbl, status_lbl, p_bar, speed_lbl, cancel_btn = self._create_transfer_row(title, dest_console, worker)
+        
+        self.dl_layout.insertWidget(self.dl_layout.count() - 1, row_widget)
+        self.dl_panel.show()
+        
+        self.active_downloads.append((worker, row_widget))
+        
+        worker.progress.connect(lambda pct, dmb, tmb, spd, pb=p_bar, sl=status_lbl, sp=speed_lbl: self._update_transfer_progress(pb, sl, sp, pct, dmb, tmb, spd))
+        worker.finished.connect(lambda succ, msg, w=worker, rw=row_widget, sl=status_lbl, pb=p_bar, sp=speed_lbl, cb=cancel_btn: self._on_transfer_finished(w, rw, sl, pb, sp, cb, succ, msg))
+        
+        worker.start()
+
+    def _update_transfer_progress(self, p_bar, status_lbl, speed_lbl, pct, downloaded_mb, total_mb, speed_str):
+        p_bar.setValue(int(pct * 100))
+        status_lbl.setText(f"Descargando... {downloaded_mb:.1f} MB / {total_mb:.1f} MB")
+        speed_lbl.setText(speed_str)
+
+    def _on_transfer_finished(self, worker, row_widget, status_lbl, p_bar, speed_lbl, cancel_btn, success, msg):
+        speed_lbl.setText("")
+        cancel_btn.hide()
+        
+        if worker in [w for w, r in self.active_downloads]:
+            self.active_downloads = [(w, r) for w, r in self.active_downloads if w != worker]
+            
+        if success:
+            p_bar.setValue(100)
+            p_bar.setStyleSheet(f"QProgressBar {{ background-color: {COLORS['bg_mid']}; border: none; border-radius: 4px; }} QProgressBar::chunk {{ background-color: {COLORS['green']}; border-radius: 4px; }}")
+            status_lbl.setText(f"✓ {msg}")
+            status_lbl.setStyleSheet(f"font-size: 11px; color: {COLORS['green']}; border: none;")
+            from ui.library_view import LibraryView
+            if isinstance(self.current_view_widget, LibraryView):
+                self.filter_games()
+            
+            QTimer.singleShot(3000, lambda: self._check_hide_dl_panel(row_widget))
+        else:
+            p_bar.setStyleSheet(f"QProgressBar {{ background-color: {COLORS['bg_mid']}; border: none; border-radius: 4px; }} QProgressBar::chunk {{ background-color: {COLORS['red']}; border-radius: 4px; }}")
+            status_lbl.setText(f"✗ {msg}")
+            status_lbl.setStyleSheet(f"font-size: 11px; color: {COLORS['red']}; border: none;")
+
+    def _check_hide_dl_panel(self, row_widget):
+        row_widget.deleteLater()
+        if not self.active_downloads:
+            self.dl_panel.hide()

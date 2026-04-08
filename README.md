@@ -1,63 +1,63 @@
 # 🌌 Chvstx Nexus
 
-![Version](https://img.shields.io/badge/version-3.0.0-gold)
+![Version](https://img.shields.io/badge/version-4.0.0-gold)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**Chvstx Nexus** es una interfaz unificada, moderna y profundamente personalizada para gestionar tu colección de juegos clásicos. Con su nueva **Experiencia Nexus 2.0**, ofrece una navegación de élite inspirada en las consolas clásicas más premium.
+**Chvstx Nexus** es una interfaz unificada, moderna y profundamente personalizada para gestionar tu colección de juegos clásicos. Con su nueva arquitectura en **PySide6**, ofrece una navegación de élite inspirada en las consolas clásicas más premium.
 
 > [!TIP]
-> **¿Buscas la última versión ejecutable?** Descárgala directamente desde la sección de [Releases](https://github.com/DavidFR-2000/ChvstxNexux/releases/latest)
+> **¿Buscas la última versión instalable?** Descárgala directamente desde la sección de [Releases](https://github.com/DavidFR-2000/ChvstxNexux/releases/latest).
 
 ---
 
-## 🚀 Novedades v3.0.0 (The Nexus PySide6 Engine)
+## 🚀 Novedades de la v4.0.0 (The Downloader Engine Update)
 
-- **⚡ Motor PySide6**: Reescritura completa del código nativo en C++/Qt para ofrecer un rendimiento masivo, fluidez a 60FPS y tiempos de carga instantáneos frente a CustomTkinter.
-- **🎮 Interfaz Ultra-Fluida**: Rediseño total de la navegación. Ahora con layouts dinámicos y la nueva vista en cuadrícula de gran resolución.
-- **☁️ Hub de Descargas Inteligente**: Integración directa con repositorios como Retrostic, Myrient y Homebrew para descargar juegos y ROMs limpiamente.
-- **📦 Auto-Extracción de ROMs**: El nuevo sistema descomprime automáticamente `.zip`, `.7z` y `.rar` detectando qué consolas (como PS2 o GameCube) necesitan la ISO directamente.
-- **📂 Escaneo de Subcarpetas**: Lee juegos en cualquier nivel de profundidad de carpetas.
-- **📚 Enciclopedia y Ajustes Dinámicos**: Integración con Wikipedia, API REST, Ajustes in-app con detector de Cores faltantes en RetroArch, y mucho más.
+- **🌐 Servidores Axekin & Vikingfile Integrados**: Inyección de rutinas anti-bot navtivas (`cloudscraper`) para acceder al infinito catálogo online de **Axekin** y extraer los juegos a gran velocidad en plano de fondo.
+- **📥 Gestor de Descargas Global Concurrente**: Un gestor global anclado siempre en la parte inferior, con estilo _Torrent_. Dispone de cálculo lógico en vivo de megabytes por segundo (MB/s), procesamiento múltiple sin bloqueos para bajar varios juegos a la vez, y botones de cancelación táctica (`Kill-Switch`).
+- **🗑️ Limpieza Absoluta de Colecciones**: Controla tu disco duro físicamente. El nuevo menú permite borrar definitivamente cualquier ROM inútil o duplicada con un clic, regenerando completamente los menús visuales para purgar su imagen.
+- **📦 Instalador Nativo Experto**: Esta versión ahora debuta con un empaquetado `Inno Setup` construyendo los lazos formales de Windows para una instalación hiperlimpida, limpia desinstalación, y acceso directo nativo.
 
 ---
 
 ## 🌟 Características de Élite
 
-- **💙 Diseño Premium**: Estética moderna con efectos de cristal (glassmorphism), iluminaciones dinámicas y tipografía optimizada.
-- **+18 Sistemas Soportados**: Desde NES y Game Boy hasta PS2, Dreamcast y GameCube.
-- **Instalador de RetroArch Pro**: Gestión completa de la instalación y actualización de RetroArch y sus núcleos.
-- **Sincronización de Logros**: Soporte total para RetroAchievements con tutorial paso a paso.
-- **Portadas Inteligentes**: Motor dual de búsqueda de carátulas para que tu colección siempre luzca impecable.
-- **Modo Flexible**: Elige entre instalación estándar en el sistema o modo portable para llevar tu Nexus en un USB.
+- **💙 Diseño Premium**: Estética moderna con efectos de cristal (glassmorphism), iluminaciones dinámicas y tipografía elegante adaptativa.
+- **+18 Sistemas Soportados**: Desde NES y Game Boy hasta PS3, PS2, PSP y Dreamcast.
+- **Sincronización de Logros**: Soporte total para **RetroAchievements** con validaciones técnicas integradas al sistema GUI.
+- **Auto-Extracción de ROMs Oculta**: El motor interno descomprime sin avisar, leyendo archivos `.zip`, `.7z` y `.rar` una vez terminen de llegar del proveedor online para dejarte la ISO directa en la carpeta de la consola lista para exprimir el emulador.
 
 ---
 
 ## 🚀 Cómo empezar rápidamente
 
-### Opción A: Usar el ejecutable (Recomendado)
-1. Descarga el archivo `ChvstxNexus_vX.X.X.exe` desde [Releases](https://github.com/DavidFR-2000/ChvstxNexux/releases/latest).
-2. Ejecútalo y sigue el **Asistente de Bienvenida de Chvstx**.
-3. Selecciona tu carpeta de ROMs y ¡que comience la aventura!
+### Opción A: Usar el instalador (Recomendado)
+1. Descarga el paquete de instalación `ChvstxNexus_Installer.exe` que reside en el tablón oficial de [Releases](https://github.com/DavidFR-2000/ChvstxNexux/releases/latest).
+2. Ejecútalo, permite asentar sus raíces y lanza el programa desde el escritorio al finalizar.
+3. Usa la tuerca dorada, configura tu RetroArch, carga tu Hub de Descargas... ¡y a disfrutar!
 
-### Opción B: Ejecutar desde el código fuente
-1. Clona el repositorio: `git clone https://github.com/DavidFR-2000/ChvstxNexux.git`
-2. Instala las dependencias: `pip install -r requirements.txt`
-3. Lanza el Nexus: `python main.py`
+### Opción B: Ejecutar desde el código clonado
+1. Clonar: `git clone https://github.com/DavidFR-2000/ChvstxNexux.git`
+2. Instalar el alma del repositorio: `pip install -r requirements.txt`
+3. Lanzar: `python main.py`
 
 ---
 
-## 🛠️ Para Desarrolladores
+## ⚖️ Advertencia Legal y Responsabilidad
 
-### Empaquetado de la aplicación
-Para generar tu propio `.exe` con la nueva marca:
-```bash
-python build_dist.py
-```
-Este script actualizará la versión y generará el ejecutable `ChvstxNexus_vX.X.X.exe` en `dist/`.
+> [!WARNING]
+> ### 🤖 Exención sobre la Inteligencia Artificial
+> Gran parte de la programación lógica, empaquetado e ideación estética de este software ha contado con extensa asitencia de **Inteligencia Artificial Avanzada**. Por tanto, al usarse herramientas automatizadas y generativas, la arquitectura del código fuente se abastece "TAL CUAL", eximiendo cualquier garantía total de rendimiento perfecto.
+>
+> ### 🎮 Exención sobre el Hub de ROMS Emuladas
+> **Chvstx Nexus NO almacena, aloja, sube ni fomenta la distribución de ficheros de pago, abandonware, ROMs o juegos licenciados bajo Derechos de Autor en sus propios repositorios.**
+> 
+> El módulo _Hub de Descarga_ interno actúa meramente como un *navegador automatizado de atajo*, dirigiendo tráfico a servidores ajenos de Internet totalmente independientes (tales como *retrostic, Myrient o axekin*).
+> - Chvstx Nexus **NO interviene ni se enraiza o relaciona** remotamente con el estado, los caídas o la permanencia de esos portales webs.
+> - **Obligación de Propiedad:** La funcionalidad de extracción y bajada de juegos se diseñó a modo de salvaguarda de herramientas. **ÚNETE y DESCÁRGATE** una ROM sólamente si posees los cartuchos físicos, discos o licencias en tu casa que te otorgan la concesión al **Right of Backup** (Copia de Respaldo). Descargar de estos sitios y distribuirlo es un acto dependiente bajo tu pura y entera responsabilidad sin vinculaciones al equipo o repositorios de *Chvstx Nexus*.
 
 ---
 
 ## 🤝 Créditos
 Desarrollado con ❤️ por **Chvstx**.
-Inspirado por el amor a lo retro y potenciado por el motor gráfico de **PySide6 / Qt**.
+Inspirado por el amor a lo retro y potenciado brutalmente por las venas asíncronas de **PySide6 / Qt**.

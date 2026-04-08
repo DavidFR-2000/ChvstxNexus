@@ -8,8 +8,12 @@ from PySide6.QtGui import QPixmap
 from core.config import COLORS
 from core.retroarch import ra_search_game, ra_get_achievements, ra_get_badge_image
 
+# Prevenir crash si se cierra la ventana durante una descarga (los QThreads no se deben destruir si están corriendo)
+_global_detached_workers = []
+
 class AchWorker(QThread):
     finished = Signal(list)
+
     
     def __init__(self, game_name, console_name, user, apikey):
         super().__init__()
@@ -158,3 +162,16 @@ class AchievementsDialog(QDialog):
                 self.badge_labels[ach_id].setPixmap(pix)
         except:
             pass
+
+    def reject(self):
+        global _global_detached_workers
+        if hasattr(self, "worker"):
+            self.worker.finished.disconnect()
+            _global_detached_workers.append(self.worker)
+            
+        for w in getattr(self, "active_workers", []):
+            try: w.finished.disconnect()
+            except: pass
+            _global_detached_workers.append(w)
+            
+        super().reject()

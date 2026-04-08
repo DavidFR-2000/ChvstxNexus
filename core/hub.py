@@ -4,24 +4,24 @@ import re
 
 HB_REPOS = {
     "Retrostic (Todas las consolas)": {"type": "retrostic"},
-    "R-Roms (NES)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%20Entertainment%20System%20(Headered)/"},
-    "R-Roms (SNES)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Super%20Nintendo%20Entertainment%20System/"},
-    "R-Roms (N64)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%2064%20(BigEndian)/"},
-    "R-Roms (GameCube)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Nintendo%20-%20GameCube%20-%20NKit%20RVZ%20%5Bzstd-19-128k%5D/"},
-    "R-Roms (Wii)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Nintendo%20-%20Wii%20-%20NKit%20RVZ%20%5Bzstd-19-128k%5D/"},
-    "R-Roms (Game Boy)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy/"},
-    "R-Roms (GBC)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy%20Color/"},
-    "R-Roms (GBA)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy%20Advance/"},
-    "R-Roms (NDS)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%20DS%20(Decrypted)/"},
-    "R-Roms (Master System)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Sega%20-%20Master%20System%20-%20Mark%20III/"},
-    "R-Roms (Game Gear)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Sega%20-%20Game%20Gear/"},
-    "R-Roms (Mega Drive)": {"type": "myrient", "url": "https://myrient.erista.me/files/No-Intro/Sega%20-%20Mega%20Drive%20-%20Genesis/"},
-    "R-Roms (Saturn)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Sega%20-%20Saturn/"},
-    "R-Roms (Dreamcast)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Sega%20-%20Dreamcast/"},
-    "R-Roms (PS1)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Sony%20-%20PlayStation/"},
-    "R-Roms (PS2)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Sony%20-%20PlayStation%202/"},
-    "R-Roms (PS3)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Sony%20-%20PlayStation%203/"},
-    "R-Roms (PSP)": {"type": "myrient", "url": "https://myrient.erista.me/files/Redump/Sony%20-%20PlayStation%20Portable/"},
+    "Axekin (NES)": {"type": "axekin", "system": "1"},
+    "Axekin (SNES)": {"type": "axekin", "system": "2"},
+    "Axekin (N64)": {"type": "axekin", "system": "3"},
+    "Axekin (GameCube)": {"type": "axekin", "system": "4"},
+    "Axekin (Wii)": {"type": "axekin", "system": "5"},
+    "Axekin (Game Boy)": {"type": "axekin", "system": "8"},
+    "Axekin (GBC)": {"type": "axekin", "system": "9"},
+    "Axekin (GBA)": {"type": "axekin", "system": "10"},
+    "Axekin (NDS)": {"type": "axekin", "system": "11"},
+    "Axekin (Master System)": {"type": "axekin", "system": "24"},
+    "Axekin (Game Gear)": {"type": "axekin", "system": "28"},
+    "Axekin (Mega Drive)": {"type": "axekin", "system": "25"},
+    "Axekin (Saturn)": {"type": "axekin", "system": "26"},
+    "Axekin (Dreamcast)": {"type": "axekin", "system": "27"},
+    "Axekin (PS1)": {"type": "axekin", "system": "13"},
+    "Axekin (PS2)": {"type": "axekin", "system": "14"},
+    "Axekin (PS3)": {"type": "axekin", "system": "15"},
+    "Axekin (PSP)": {"type": "axekin", "system": "18"},
     "Homebrew (Game Boy)": {
         "type": "github",
         "api":  "https://api.github.com/repos/gbdev/database/contents/entries",
@@ -84,39 +84,46 @@ def search_hub_games(console_name: str, query: str):
             })
         return games
 
-    elif repo.get("type") == "myrient":
+    elif repo.get("type") == "axekin":
         if not query:
-            raise ValueError("Escribe un juego para buscar en esta consola de R-Roms.")
+            raise ValueError("Escribe un juego para buscar en esta consola de Axekin.")
             
-        url = repo["url"]
-        r = requests.get(url, headers=headers, timeout=15)
+        system = repo.get("system")
+        url = f"https://www.axekin.com/games?platform={system}&search={requests.utils.quote(query)}"
+        
+        import cloudscraper
+        scraper = cloudscraper.create_scraper()
+        r = scraper.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
         r.raise_for_status()
         
         soup = BeautifulSoup(r.text, 'html.parser')
-        nodes = soup.find_all('a', href=True)
         
         games = []
-        valid_exts_myrient = (".zip", ".7z", ".rar", ".rvz")
-        
-        for node in nodes:
-            filename = requests.utils.unquote(node['href'])
-            if not any(filename.lower().endswith(e) for e in valid_exts_myrient):
+        for a in soup.find_all('a', href=re.compile(r'^/games/.+')):
+            title = a.get_text(strip=True)
+            if not title or title.lower() in ("browse", "view all"):
                 continue
             
-            if query in filename.lower():
-                title = filename.rsplit('.', 1)[0]
-                dl_link = url + node['href']
-                games.append({
-                    "_slug": filename,
-                    "_repo": repo,
-                    "title": title,
-                    "author": "R-Roms/Myrient",
-                    "description": f"Encontrado en {console_name}. Archivo: {filename}",
-                    "tags": [console_name.split(" ")[-1].upper()],
-                    "files": [{"url": dl_link}]
-                })
-                if len(games) >= 50:
-                    break
+            slug = a['href'].split('/games/')[-1]
+            if not slug or '?' in slug:
+                continue
+                
+            dl_link = f"https://www.axekin.com/games/{slug}"
+            
+            if any(g["_slug"] == slug for g in games):
+                continue
+                
+            games.append({
+                "_slug": slug,
+                "_repo": repo,
+                "title": title,
+                "author": f"Axekin (Dir)",
+                "description": f"Encontrado en Axekin. ID: {slug}",
+                "tags": [console_name.split(" ")[-1].replace(")", "")],
+                "files": [{"url": dl_link}]
+            })
+            if len(games) >= 50:
+                break
         return games
 
     else:
@@ -148,7 +155,7 @@ def get_download_url(game: dict) -> str:
     repo = game.get("_repo", {})
     slug = game.get("_slug", "")
     
-    if repo.get("type") == "retrostic":
+    if repo.get("type") in ("retrostic", "axekin"):
         return game.get("files", [{}])[0].get("url")
         
     for f in game.get("files", []):

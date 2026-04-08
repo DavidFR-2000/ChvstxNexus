@@ -79,7 +79,7 @@ class HubSearchWorker(QThread):
             self.error.emit(str(e))
 
 class HubDownloadWorker(QThread):
-    progress = Signal(float, float, float) # pct, downloaded_mb, total_mb
+    progress = Signal(float, float, float, str) # pct, downloaded_mb, total_mb, speed_str
     finished = Signal(bool, str) # success, msg
     
     def __init__(self, url, dest_dir, filename, repo, allowed_extensions=None):
@@ -89,6 +89,10 @@ class HubDownloadWorker(QThread):
         self.filename = filename
         self.repo = repo
         self.allowed_extensions = allowed_extensions or []
+        self._is_cancelled = False
+        
+    def cancel(self):
+        self._is_cancelled = True
         
     def run(self):
         import os, time, re
@@ -100,6 +104,9 @@ class HubDownloadWorker(QThread):
             headers = {"User-Agent": "Mozilla/5.0"}
             
             target_url = self.url
+            request_method = "GET"
+            request_data = None
+
             if self.repo.get("type") == "retrostic":
                 headers["Referer"] = "https://www.retrostic.com/"
                 r_page = session.get(self.url, headers=headers, timeout=15)
@@ -125,39 +132,106 @@ class HubDownloadWorker(QThread):
                 target_url = found
                 import urllib.parse
                 self.filename = urllib.parse.unquote(target_url.split("/")[-1])
+            elif self.repo.get("type") == "axekin":
+                headers["Referer"] = self.url
+                
+                r_page = session.get(self.url, headers=headers, timeout=20)
+                r_page.raise_for_status()
+                import re
+                m = re.search(r'https?://vikingfile\.com/f/[a-zA-Z0-9_-]+', r_page.text)
+                if not m:
+                    raise Exception("No se encontró enlace de descarga a Vikingfile.")
+                target_url = m.group(0)
+                
+                # Validación obligatoria de descarga de Axekin
+                try:
+                    game_id = self.url.split('-')[-1]
+                    val_headers = headers.copy()
+                    val_headers["Accept"] = "application/json"
+                    xsrf = session.cookies.get("XSRF-TOKEN")
+                    if xsrf:
+                        from urllib.parse import unquote
+                        val_headers["X-XSRF-TOKEN"] = unquote(xsrf)
+                    session.post(f"https://www.axekin.com/games/{game_id}/download", headers=val_headers, timeout=10)
+                except Exception as e:
+                    print("Advertencia en validación de Axekin:", e)
+                    
+                request_method = "GET"
+                request_data = None
             else:
                 import urllib.parse
                 self.filename = urllib.parse.unquote(self.url.split("/")[-1]) or f"{sanitize_name(self.filename)}.zip"
             
-            filepath = os.path.join(self.dest_dir, self.filename)
-            r = session.get(target_url, headers=headers, timeout=30, stream=True)
+            if request_method == "POST":
+                r = session.post(target_url, headers=headers, data=request_data, timeout=30, stream=True)
+            else:
+                r = session.get(target_url, headers=headers, params=request_data, timeout=30, stream=True)
+                
             if r.status_code == 404 and "hh3.gbdev.io" in target_url and self.repo.get("type") != "retrostic":
                 fallback = target_url.replace(self.repo.get("cdn",""), self.repo.get("raw",""))
                 r = session.get(fallback, headers=headers, timeout=30, stream=True)
             r.raise_for_status()
+            
+            if self.repo.get("type") == "axekin":
+                cd = r.headers.get('content-disposition', '')
+                import re
+                if 'filename="' in cd:
+                    m = re.search(r'filename="([^"]+)"', cd)
+                    if m: 
+                        from urllib.parse import unquote
+                        self.filename = unquote(m.group(1).encode('latin-1','ignore').decode('utf-8','ignore'))
+                elif 'filename=' in cd:
+                    from urllib.parse import unquote
+                    fname = cd.split('filename=')[1].split(';')[0].strip(' "\'')
+                    self.filename = unquote(fname.encode('latin-1','ignore').decode('utf-8','ignore'))
+                else:
+                    self.filename = f"{sanitize_name(self.filename)}.zip"
+
+            filepath = os.path.join(self.dest_dir, self.filename)
             
             total_bytes = int(r.headers.get('content-length', 0))
             total_mb = total_bytes / (1024*1024) if total_bytes else 0
             
             downloaded = 0
             last_t = time.time()
+            last_down = 0
+            speed_str = "0.0 MB/s"
+            
             with open(filepath, "wb") as f:
                 for chunk in r.iter_content(65536):
+                    if self._is_cancelled:
+                        f.close()
+                        import os
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
+                        self.finished.emit(False, "Descarga cancelada.")
+                        return
+                        
                     if chunk:
                         f.write(chunk)
                         downloaded += len(chunk)
                         if total_bytes > 0:
                             now = time.time()
-                            if now - last_t > 0.15:
+                            if now - last_t > 0.5:
+                                duration = now - last_t
+                                bps = (downloaded - last_down) / duration
+                                if bps > 1024 * 1024:
+                                    speed_str = f"{bps / (1024*1024):.1f} MB/s"
+                                elif bps > 1024:
+                                    speed_str = f"{bps / 1024:.1f} KB/s"
+                                else:
+                                    speed_str = f"{bps:.1f} B/s"
                                 last_t = now
+                                last_down = downloaded
+                                
                                 down_mb = downloaded / (1024*1024)
-                                self.progress.emit(downloaded / total_bytes, down_mb, total_mb)
+                                self.progress.emit(downloaded / total_bytes, down_mb, total_mb, speed_str)
             
             
             # Subdirectories and Auto-Extraction Logic
             ext = os.path.splitext(self.filename)[1].lower()
             if ext and ext not in self.allowed_extensions and ext in (".zip", ".7z", ".rar"):
-                self.progress.emit(1.0, down_mb, total_mb) # Force 100%
+                self.progress.emit(1.0, down_mb, total_mb, "Completado") # Force 100%
                 self.finished.emit(True, f"Descargado. Extrayendo {self.filename}...")
                 
                 try:
@@ -175,7 +249,7 @@ class HubDownloadWorker(QThread):
                             r.extractall(self.dest_dir)
                             
                     os.remove(filepath)
-                    self.finished.emit(True, f"Completado y extraído: {title}")
+                    self.finished.emit(True, f"Completado y extraído: {self.filename}")
                     return
                 except Exception as e:
                     self.finished.emit(False, f"Descargado, pero falló la extracción: {e}")

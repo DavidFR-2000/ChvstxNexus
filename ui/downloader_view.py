@@ -11,7 +11,6 @@ class DownloaderView(QtWidgets.QWidget):
         self.main_window = main_window
         self._setup_ui()
         self.search_worker = None
-        self.download_worker = None
 
     def _setup_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
@@ -68,13 +67,6 @@ class DownloaderView(QtWidgets.QWidget):
         self.status_label.setStyleSheet(f"color: {COLORS['text_dim']}; margin-top: 10px; border: none;")
         controls_layout.addWidget(self.status_label)
 
-        self.progress_bar = QtWidgets.QProgressBar()
-        self.progress_bar.setFixedHeight(8)
-        self.progress_bar.setTextVisible(False)
-        self.progress_bar.setStyleSheet(f"QProgressBar {{ background-color: {COLORS['bg_dark']}; border: none; border-radius: 4px; }} QProgressBar::chunk {{ background-color: {COLORS['accent']}; border-radius: 4px; }}")
-        self.progress_bar.hide()
-        controls_layout.addWidget(self.progress_bar)
-        
         # Add controls to layout but give it some margin
         ct = QtWidgets.QWidget()
         ct_lay = QtWidgets.QVBoxLayout(ct)
@@ -86,25 +78,22 @@ class DownloaderView(QtWidgets.QWidget):
         self.scroll = QtWidgets.QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-        layout.addWidget(self.scroll, stretch=1)
-
+        
         self.results_container = QtWidgets.QWidget()
         self.results_container.setStyleSheet("background: transparent;")
         self.scroll.setWidget(self.results_container)
-        
         self.flow_layout = FlowLayout(self.results_container, margin=20, hSpacing=20, vSpacing=20)
+        layout.addWidget(self.scroll, stretch=1)
 
     def _start_search(self):
         query = self.search_input.text().strip()
         console_name = self.source_combo.currentText()
-        if not query and HB_REPOS.get(console_name, {}).get("type") in ("retrostic", "myrient"):
+        if not query and HB_REPOS.get(console_name, {}).get("type") in ("retrostic", "myrient", "axekin"):
             self._set_status("Por favor, introduce un término de búsqueda para esta fuente.", COLORS["yellow"])
             return
 
         self._clear_results()
         self._set_status(f"⏳ Buscando en {console_name}...", COLORS["text_bright"])
-        self.progress_bar.setRange(0, 0)
-        self.progress_bar.show()
 
         if self.search_worker:
             self.search_worker.quit()
@@ -124,7 +113,6 @@ class DownloaderView(QtWidgets.QWidget):
         self.status_label.setStyleSheet(f"color: {color}; margin-top: 10px; border: none;")
 
     def _on_search_finished(self, games):
-        self.progress_bar.hide()
         self._set_status(f"✓ {len(games)} juegos encontrados.", COLORS["green"])
         if not games:
             lbl = QtWidgets.QLabel("No se encontraron resultados.")
@@ -137,7 +125,6 @@ class DownloaderView(QtWidgets.QWidget):
             self.flow_layout.addWidget(self._create_game_card(g))
 
     def _on_search_error(self, err):
-        self.progress_bar.hide()
         self._set_status(f"✗ Error: {err}", COLORS["red"])
 
     def _create_game_card(self, game):
@@ -171,7 +158,7 @@ class DownloaderView(QtWidgets.QWidget):
             
             repo = game.get("_repo", {})
             cns = self.source_combo.currentText()
-            if repo.get("type") in ("retrostic", "myrient") and game.get("tags"):
+            if repo.get("type") in ("retrostic", "myrient", "axekin") and game.get("tags"):
                 cns = game.get("tags")[0]
 
             btn.clicked.connect(lambda _, u=dl_url, t=game.get("title", ""), c=cns, s=game.get("_slug",""), rp=repo: self._start_download(u, t, c, s, rp))
@@ -185,7 +172,6 @@ class DownloaderView(QtWidgets.QWidget):
         return card
 
     def _start_download(self, url, title, console_name, slug, repo):
-        # Determine logical local category
         dest_console = "Descargas"
         from ui.main_window import CONSOLES
         for cn, info in CONSOLES.items():
@@ -196,34 +182,7 @@ class DownloaderView(QtWidgets.QWidget):
         import os
         roms_dir = self.main_window.config.get("roms_dir", os.path.expanduser("~/ROMs"))
         dest_dir = os.path.join(roms_dir, dest_console)
-        
-        if self.download_worker and self.download_worker.isRunning():
-            self._set_status("Ya hay una descarga en curso. Espera a que termine.", COLORS["red"])
-            return
-
-        self._set_status(f"⬇ Procesando descarga de {title} a {dest_console}...", COLORS["yellow"])
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.show()
-        
         info = CONSOLES.get(dest_console, {})
         exts = info.get("extensions", [])
         
-        self.download_worker = HubDownloadWorker(url, dest_dir, title, repo, exts)
-        self.download_worker.progress.connect(self._on_download_progress)
-        self.download_worker.finished.connect(self._on_download_finished)
-        self.download_worker.start()
-
-    def _on_download_progress(self, pct, downloaded_mb, total_mb):
-        self.progress_bar.setValue(int(pct * 100))
-        self._set_status(f"⬇ Descargando... {downloaded_mb:.1f} MB / {total_mb:.1f} MB", COLORS["yellow"])
-
-    def _on_download_finished(self, success, msg):
-        self.progress_bar.hide()
-        if success:
-            self._set_status(f"✓ {msg}", COLORS["green"])
-            from ui.library_view import LibraryView
-            if isinstance(self.main_window.current_view_widget, LibraryView):
-                self.main_window.filter_games()
-        else:
-            self._set_status(f"✗ Error: {msg}", COLORS["red"])
+        self.main_window.start_download(url, dest_dir, title, repo, exts, dest_console)

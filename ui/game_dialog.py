@@ -136,7 +136,38 @@ class GameDialog(QDialog):
         rel_btn.clicked.connect(lambda: (self.accept(), self.reload_cover.emit(game_file, console_name)))
         v_right.addWidget(rel_btn)
         
+        del_btn = QPushButton("🗑  Eliminar Juego")
+        del_btn.setStyleSheet(f"QPushButton {{ border: 1px solid {COLORS['red']}; border-radius: 8px; padding: 6px; color: {COLORS['red']}; }} QPushButton:hover {{ background-color: {COLORS['bg_hover']}; }}")
+        del_btn.clicked.connect(self._on_delete_clicked)
+        v_right.addWidget(del_btn)
+        
         layout.addWidget(right_panel, 1)
+
+    def _on_delete_clicked(self):
+        reply = QMessageBox.question(self, 'Confirmar eliminación', 
+                                    f"¿Estás seguro de que quieres eliminar {self.name}?\nEsto borrará la ROM permanentemente.",
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            import os
+            roms_dir = self.config.get("roms_dir", "")
+            filepath = os.path.join(roms_dir, self.console_name, self.game_file)
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", f"No se pudo eliminar el archivo:\n{e}")
+                    return
+            
+            favs = self.config.setdefault("favorites", [])
+            match = next((f for f in favs if f["file"] == self.game_file and f["console"] == self.console_name), None)
+            if match:
+                favs.remove(match)
+                from core.config import save_config
+                save_config(self.config)
+                
+            self.accept()
+            # Disparar rename_game para que el MainWindow fuerce el refresco inteligente
+            self.rename_game.emit(self.game_file, self.console_name)
 
     def _on_play_clicked(self):
         retroarch_path = self.config.get("retroarch_path", "")
