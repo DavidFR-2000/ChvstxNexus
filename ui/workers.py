@@ -251,12 +251,70 @@ class HubDownloadWorker(QThread):
                     os.remove(filepath)
                     self.finished.emit(True, f"Completado y extraído: {self.filename}")
                     return
+                except ImportError:
+                    pass
                 except Exception as e:
                     self.finished.emit(False, f"Descargado, pero falló la extracción: {e}")
                     return
-            
-            self.finished.emit(True, f"Descargado: {self.filename}")
+            else:
+                self.finished.emit(True, f"Completado: {self.filename}")
+                return
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            self.finished.emit(False, str(e))
+
+class UpdateWorker(QThread):
+    update_available = Signal(str, str, str)
+    
+    def run(self):
+        import requests
+        from core.config import UPDATE_URL, CURRENT_VERSION
+        try:
+            r = requests.get(UPDATE_URL, timeout=5)
+            if r.status_code == 200:
+                data = r.json()
+                tag = data.get("tag_name", "")
+                tag_ver = tag.replace("v", "")
+                
+                def ver_to_tuple(v):
+                    return tuple(map(int, v.split(".")))
+                
+                if ver_to_tuple(tag_ver) > ver_to_tuple(CURRENT_VERSION):
+                    for asset in data.get("assets", []):
+                        if asset.get("name", "").endswith("_Setup.exe") or asset.get("name", "").endswith(".exe"):
+                            dl_url = asset.get("browser_download_url")
+                            self.update_available.emit(tag_ver, data.get("body", ""), dl_url)
+                            break
+        except Exception:
+            pass
+
+class UpdateDownloaderWorker(QThread):
+    progress = Signal(int)
+    finished = Signal(bool, str)
+    
+    def __init__(self, url):
+        super().__init__()
+        self.url = url
+        
+    def run(self):
+        import requests, os, tempfile
+        try:
+            r = requests.get(self.url, stream=True, timeout=10)
+            r.raise_for_status()
+            total_size = int(r.headers.get('content-length', 0))
+            
+            tmp_path = os.path.join(tempfile.gettempdir(), "ChvstxNexus_Update_Setup.exe")
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+                
+            downloaded = 0
+            with open(tmp_path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=65536):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total_size > 0:
+                            self.progress.emit(int(downloaded * 100 / total_size))
+            
+            self.finished.emit(True, tmp_path)
+        except Exception as e:
             self.finished.emit(False, str(e))

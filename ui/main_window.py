@@ -51,6 +51,8 @@ class MainWindow(QMainWindow):
             self.select_console(active[0])
         else:
             self.open_settings()
+            
+        self._check_updates()
 
     def _build_top_nav(self):
         self.nav = QWidget()
@@ -491,3 +493,38 @@ class MainWindow(QMainWindow):
         row_widget.deleteLater()
         if not self.active_downloads:
             self.dl_panel.hide()
+
+    def _check_updates(self):
+        from ui.workers import UpdateWorker
+        self.update_w = UpdateWorker()
+        self.update_w.update_available.connect(self._on_update_available)
+        self.update_w.start()
+
+    def _on_update_available(self, version, notes, dl_url):
+        from PySide6.QtWidgets import QMessageBox
+        reply = QMessageBox.question(self, "Actualización Disponible", 
+                                     f"¡Hay una nueva versión de Chvstx Nexus disponible (v{version})!\n\n¿Deseas descargarla e instalarla ahora?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            from PySide6.QtWidgets import QProgressDialog
+            self.upd_dlg = QProgressDialog("Descargando actualización...", "Cancelar", 0, 100, self)
+            self.upd_dlg.setWindowTitle(f"Descargando v{version}")
+            self.upd_dlg.setWindowModality(Qt.WindowModality.WindowModal)
+            
+            from ui.workers import UpdateDownloaderWorker
+            self.upd_down_w = UpdateDownloaderWorker(dl_url)
+            self.upd_down_w.progress.connect(self.upd_dlg.setValue)
+            self.upd_down_w.finished.connect(self._on_update_downloaded)
+            self.upd_dlg.canceled.connect(self.upd_down_w.terminate)
+            self.upd_down_w.start()
+
+    def _on_update_downloaded(self, success, path_or_err):
+        from PySide6.QtWidgets import QMessageBox
+        self.upd_dlg.close()
+        if success:
+            import os, sys
+            QMessageBox.information(self, "Listo", "La actualización se ha descargado.\nSe cerrará la aplicación para instalar el parche.")
+            os.startfile(path_or_err)
+            sys.exit(0)
+        else:
+            QMessageBox.critical(self, "Error", f"No se pudo descargar la actualización:\n{path_or_err}")
