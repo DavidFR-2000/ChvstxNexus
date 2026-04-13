@@ -43,14 +43,20 @@ class RetroArchDownloadWorker(QtCore.QThread):
             # Extract
             os.makedirs(self.target_dir, exist_ok=True)
             with py7zr.SevenZipFile(archive_path, mode='r') as z:
+                dest_real = os.path.realpath(self.target_dir)
+                for member in z.getnames():
+                    target = os.path.realpath(os.path.join(dest_real, member))
+                    if not target.startswith(dest_real + os.sep) and target != dest_real:
+                        raise Exception(f"Path Traversal evitado instalando RA: {member}")
                 # py7zr doesn't offer easy progress callbacks per file in a simple way, so we just wait
                 z.extractall(path=self.target_dir)
             
             # Clean up
             try:
                 os.remove(archive_path)
-            except:
-                pass
+            except Exception as e:
+                import logging
+                logging.error(f"No se pudo limpiar el archivo temporal del wizard: {e}")
                 
             # Buscar el retroarch.exe dentro, a veces viene en subcarpeta RetroArch-Win64
             exe_path = os.path.join(self.target_dir, "retroarch.exe")

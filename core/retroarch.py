@@ -45,7 +45,9 @@ def ra_search_game(game_name, console_name, ra_user="", ra_apikey=""):
                 best_score = score
                 best_id = g.get("ID")
         return best_id if best_score > 0 else None
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.error(f"Error RA search_game: {e}")
         return None
 
 def ra_get_console_games(console_name, ra_user="", ra_apikey=""):
@@ -58,8 +60,9 @@ def ra_get_console_games(console_name, ra_user="", ra_apikey=""):
         r = requests.get(url, timeout=8)
         if r.status_code == 200:
             return r.json()
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.error(f"Error RA get_console_games: {e}")
     return []
 
 def ra_get_achievements(ra_game_id, ra_user="", ra_apikey=""):
@@ -85,7 +88,9 @@ def ra_get_achievements(ra_game_id, ra_user="", ra_apikey=""):
             })
         result.sort(key=lambda x: (not x["unlocked"], x["title"]))
         return result
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.error(f"Error RA get_achievements: {e}")
         return None
 
 def ra_get_badge_image(badge_url, unlocked=True):
@@ -96,8 +101,9 @@ def ra_get_badge_image(badge_url, unlocked=True):
         if r.status_code == 200:
             img = Image.open(BytesIO(r.content)).convert("RGBA")
             return img.resize((48, 48), Image.Resampling.LANCZOS)
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.warning(f"Error RA get_badge: {e}")
     return None
 
 def ra_get_user_summary(ra_user, ra_apikey):
@@ -109,6 +115,7 @@ def ra_get_user_summary(ra_user, ra_apikey):
         r = requests.get(url, timeout=8)
         if r.status_code == 200:
             return r.json()
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.error(f"Error RA get_user_summary: {e}")
     return None

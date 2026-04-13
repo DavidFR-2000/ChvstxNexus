@@ -287,7 +287,9 @@ class MainWindow(QMainWindow):
         path = os.path.join(cache, f"{sanitize_name(name)}.jpg")
         if os.path.exists(path):
             try: os.remove(path)
-            except: pass
+            except Exception as e:
+                import logging
+                logging.warning(f"No se pudo limpiar cover cache antiguo {path}: {e}")
             
         from ui.workers import CoverDownloadWorker
         info = CONSOLES.get(console_name, {})

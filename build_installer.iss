@@ -1,6 +1,6 @@
 [Setup]
 AppName=Chvstx Nexus
-AppVersion=3.9.0
+AppVersion=4.0.1
 AppPublisher=DavidFR-2000
 AppPublisherURL=https://github.com/DavidFR-2000/ChvstxNexux
 DefaultDirName={localappdata}\Programs\ChvstxNexus
@@ -8,7 +8,7 @@ DefaultGroupName=Chvstx Nexus
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=dist
-OutputBaseFilename=ChvstxNexus_v3.9.0_Setup
+OutputBaseFilename=ChvstxNexus_v4.0.1_Setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern

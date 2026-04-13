@@ -3,7 +3,7 @@ import json
 import sys
 
 # ─── Configuración Global ────────────────────────────────────────────────────
-CURRENT_VERSION = "4.0.0"
+CURRENT_VERSION = "4.0.1"
 APP_NAME = "Chvstx Nexus"
 REPO_URL = "https://github.com/DavidFR-2000/ChvstxNexux"
 UPDATE_URL = "https://api.github.com/repos/DavidFR-2000/ChvstxNexux/releases/latest"
@@ -20,6 +20,15 @@ else:
 
 CONFIG_FILE   = os.path.join(CONFIG_DIR, ".chvstxnexus_config.json")
 PLAYTIME_FILE = os.path.join(CONFIG_DIR, ".chvstxnexus_playtime.json")
+
+import logging
+LOG_FILE = os.path.join(CONFIG_DIR, "nexus_debug.log")
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.WARNING,
+    format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s'
+)
+
 
 # ─── Apariencia ──────────────────────────────────────────────────────────────
 COLORS = {
@@ -113,8 +122,8 @@ def load_config():
                 if k not in data:
                     data[k] = v
             return data
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Failed to load config file: {e}")
     return default
 
 def check_branding_migration(cfg):
@@ -133,8 +142,8 @@ def load_playtime():
         try:
             with open(PLAYTIME_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Failed to load playtime file: {e}")
     return {}
 
 def save_playtime(data):

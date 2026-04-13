@@ -108,7 +108,9 @@ class StatsView(QWidget):
                     pix = QPixmap.fromImage(img)
                     self.avatar_lbl.setPixmap(pix.scaled(100, 100, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
                     self.avatar_lbl.setStyleSheet("border-radius: 50px;")
-            except: pass
+            except Exception as e:
+                import logging
+                logging.warning(f"Error aplicando radio de borde en avatar: {e}")
             
         self.recent_games = data.get("RecentGames", {})
         self._refresh_playtime_achievements()

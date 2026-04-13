@@ -14,7 +14,9 @@ class GameInfoWorker(QThread):
         try:
             data = fetch_game_info(self.game_name, self.platform_id, self.console_name)
             self.finished.emit(data)
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.error(f"Error fetching game info: {e}")
             self.finished.emit(None)
 
 InfoWorker = GameInfoWorker
@@ -31,7 +33,9 @@ class AchWorker(QThread):
         try:
             data = ra_get_achievements(self.game_id, self.user, self.apikey)
             self.finished.emit(data or {})
-        except:
+        except Exception as e:
+            import logging
+            logging.error(f"Error fetching achievements: {e}")
             self.finished.emit({})
 
 class RAStatsWorker(QThread):
@@ -235,24 +239,35 @@ class HubDownloadWorker(QThread):
                 self.finished.emit(True, f"Descargado. Extrayendo {self.filename}...")
                 
                 try:
+                    def assert_safe_extract(names_list, dest):
+                        dest_real = os.path.realpath(dest)
+                        for member in names_list:
+                            target = os.path.realpath(os.path.join(dest_real, member))
+                            if not target.startswith(dest_real + os.sep) and target != dest_real:
+                                raise Exception(f"Path Traversal evitado: {member}")
+
                     if ext == ".zip":
                         import zipfile
                         with zipfile.ZipFile(filepath, 'r') as z:
+                            assert_safe_extract(z.namelist(), self.dest_dir)
                             z.extractall(self.dest_dir)
                     elif ext == ".7z":
                         import py7zr
                         with py7zr.SevenZipFile(filepath, mode='r') as z:
+                            assert_safe_extract(z.getnames(), self.dest_dir)
                             z.extractall(path=self.dest_dir)
                     elif ext == ".rar":
                         import rarfile
                         with rarfile.RarFile(filepath, 'r') as r:
+                            assert_safe_extract(r.namelist(), self.dest_dir)
                             r.extractall(self.dest_dir)
                             
                     os.remove(filepath)
                     self.finished.emit(True, f"Completado y extraído: {self.filename}")
                     return
-                except ImportError:
-                    pass
+                except ImportError as e:
+                    import logging
+                    logging.warning(f"Extensión no soportada por falta de librería: {e}")
                 except Exception as e:
                     self.finished.emit(False, f"Descargado, pero falló la extracción: {e}")
                     return
@@ -284,8 +299,9 @@ class UpdateWorker(QThread):
                             dl_url = asset.get("browser_download_url")
                             self.update_available.emit(tag_ver, data.get("body", ""), dl_url)
                             break
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.error(f"Error checking for updates: {e}")
 
 class UpdateDownloaderWorker(QThread):
     progress = Signal(int)

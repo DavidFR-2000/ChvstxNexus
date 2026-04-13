@@ -160,8 +160,9 @@ class AchievementsDialog(QDialog):
             pix = QPixmap.fromImage(qim)
             if ach_id in self.badge_labels:
                 self.badge_labels[ach_id].setPixmap(pix)
-        except:
-            pass
+        except Exception as e:
+            import logging
+            logging.error(f"Error cargando badge pixmap: {e}")
 
     def reject(self):
         global _global_detached_workers
@@ -171,7 +172,9 @@ class AchievementsDialog(QDialog):
             
         for w in getattr(self, "active_workers", []):
             try: w.finished.disconnect()
-            except: pass
+            except Exception as e:
+                import logging
+                logging.warning(f"Error desconectando hilos de badges en desuso: {e}")
             _global_detached_workers.append(w)
             
         super().reject()

@@ -147,8 +147,9 @@ def search_hub_games(console_name: str, query: str):
                     gdata["_slug"] = slug
                     gdata["_repo"] = repo
                     games.append(gdata)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+                logging.warning(f"Error cargando detalle json de juego {slug}: {e}")
         return games
 
 def get_download_url(game: dict) -> str:

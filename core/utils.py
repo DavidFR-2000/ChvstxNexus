@@ -50,15 +50,20 @@ def create_desktop_shortcut(target_exe):
         desktop = os.path.join(os.environ['USERPROFILE'], 'Desktop')
         shortcut_path = os.path.join(desktop, f"{APP_NAME}.lnk")
         
+        # Sanear comillas dobles y simples para PowerShell
+        safe_target = target_exe.replace('"', '`"').replace("'", "`'")
+        safe_dir = os.path.dirname(target_exe).replace('"', '`"').replace("'", "`'")
+        
         ps_script = f"""
         $WshShell = New-Object -ComObject WScript.Shell
         $Shortcut = $WshShell.CreateShortcut("{shortcut_path}")
-        $Shortcut.TargetPath = "{target_exe}"
-        $Shortcut.WorkingDirectory = "{os.path.dirname(target_exe)}"
+        $Shortcut.TargetPath = "{safe_target}"
+        $Shortcut.WorkingDirectory = "{safe_dir}"
         $Shortcut.Save()
         """
         subprocess.run(["powershell", "-Command", ps_script], capture_output=True, check=True)
         return True
     except Exception as e:
-        print(f"Error creando acceso directo: {e}")
+        import logging
+        logging.error(f"Error creando acceso directo: {e}")
         return False

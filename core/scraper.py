@@ -47,10 +47,13 @@ def download_cover(game_name, cache_dir, platform_id=None, console_name=""):
                             img = ImageOps.pad(img, (300, 200), color="#0a0a0f")
                             img.save(cover_path, "JPEG")
                             return cover_path
-                    except Exception:
+                    except Exception as e:
+                        import logging
+                        logging.warning(f"Error guardando imagen RAWG de {clean_name}: {e}")
                         continue
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.warning(f"Error API RAWG info cover en {clean_name}: {e}")
 
     # Fuente 2: Bing Images
     try:
@@ -71,10 +74,13 @@ def download_cover(game_name, cache_dir, platform_id=None, console_name=""):
                         img = ImageOps.pad(img, (300, 200), color="#0a0a0f")
                         img.save(cover_path, "JPEG")
                         return cover_path
-                except Exception:
+                except Exception as e:
+                    import logging
+                    logging.warning(f"Error guardando imagen BING de {clean_name}: {e}")
                     continue
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.warning(f"Error API Bing Images search de {clean_name}: {e}")
 
     return None
 
@@ -119,7 +125,9 @@ def fetch_game_info(game_name, platform_id=None, console_name=""):
                         if ext:
                             desc = (ext[:500] + "...") if len(ext) > 500 else ext
                             return {"desc": desc, "name": best_res["title"]}, max_sim
-        except: pass
+        except Exception as e:
+            import logging
+            logging.warning(f"Error consultando Wikipedia para {query}: {e}")
         return None, 0
 
     wiki_data, sim_es = get_wiki_desc(f"{clean_name} {console_name} videojuego", "es")
@@ -156,7 +164,9 @@ def fetch_game_info(game_name, platform_id=None, console_name=""):
                 data["year"]   = g.get("released", "")[:4] if g.get("released") else "—"
                 data["rating"] = g.get("rating", 0)
                 if data["name"] == game_name: data["name"] = g.get("name")
-    except: pass
+    except Exception as e:
+        import logging
+        logging.warning(f"Error recolectando metadata extra RAWG para {query}: {e}")
 
     return data if (data["desc"] or data["rating"] > 0) else None
 
