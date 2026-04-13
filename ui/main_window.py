@@ -503,11 +503,50 @@ class MainWindow(QMainWindow):
         self.update_w.start()
 
     def _on_update_available(self, version, notes, dl_url):
-        from PySide6.QtWidgets import QMessageBox
-        reply = QMessageBox.question(self, "Actualización Disponible", 
-                                     f"¡Hay una nueva versión de Chvstx Nexus disponible (v{version})!\n\n¿Deseas descargarla e instalarla ahora?",
-                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if reply == QMessageBox.StandardButton.Yes:
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit
+        from core.config import COLORS
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Actualización Disponible: v{version}")
+        dlg.setFixedSize(650, 450)
+        dlg.setStyleSheet(f"background-color: {COLORS['bg_dark']}; color: {COLORS['text_bright']};")
+        
+        lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(20, 20, 20, 20)
+        
+        title = QLabel(f"¡Una nueva versión de Chvstx Nexus (v{version}) está disponible!")
+        title.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {COLORS['accent']};")
+        lay.addWidget(title)
+        
+        desc = QLabel("Descubre las novedades antes de actualizar:")
+        desc.setStyleSheet(f"font-size: 14px; color: {COLORS['text_dim']}; margin-bottom: 5px;")
+        lay.addWidget(desc)
+        
+        txt = QTextEdit()
+        txt.setReadOnly(True)
+        txt.setStyleSheet(f"background-color: {COLORS['bg_card']}; border: 1px solid {COLORS['border']}; border-radius: 5px; padding: 10px; font-size: 13px;")
+        txt.setMarkdown(notes if notes else "Sin notas de versión especificadas para esta actualización.")
+        lay.addWidget(txt, 1)
+        
+        btn_lay = QHBoxLayout()
+        btn_lay.addStretch()
+        
+        no_btn = QPushButton("Más Tarde")
+        no_btn.setFixedSize(120, 35)
+        no_btn.setStyleSheet(f"background-color: {COLORS['bg_hover']}; color: {COLORS['text_bright']}; border: 1px solid {COLORS['border']}; border-radius: 5px;")
+        no_btn.setCursor(Qt.PointingHandCursor)
+        no_btn.clicked.connect(dlg.reject)
+        
+        yes_btn = QPushButton("Actualizar Ahora")
+        yes_btn.setFixedSize(150, 35)
+        yes_btn.setStyleSheet(f"background-color: {COLORS['accent']}; color: {COLORS['bg_dark']}; font-weight: bold; border-radius: 5px;")
+        yes_btn.setCursor(Qt.PointingHandCursor)
+        yes_btn.clicked.connect(dlg.accept)
+        
+        btn_lay.addWidget(no_btn)
+        btn_lay.addWidget(yes_btn)
+        lay.addLayout(btn_lay)
+        
+        if dlg.exec() == QDialog.DialogCode.Accepted:
             from PySide6.QtWidgets import QProgressDialog
             self.upd_dlg = QProgressDialog("Descargando actualización...", "Cancelar", 0, 100, self)
             self.upd_dlg.setWindowTitle(f"Descargando v{version}")

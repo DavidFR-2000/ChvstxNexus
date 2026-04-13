@@ -3,7 +3,7 @@ import json
 import sys
 
 # ─── Configuración Global ────────────────────────────────────────────────────
-CURRENT_VERSION = "4.0.1"
+CURRENT_VERSION = "4.0.2"
 APP_NAME = "Chvstx Nexus"
 REPO_URL = "https://github.com/DavidFR-2000/ChvstxNexux"
 UPDATE_URL = "https://api.github.com/repos/DavidFR-2000/ChvstxNexux/releases/latest"
