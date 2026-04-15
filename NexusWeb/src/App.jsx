@@ -41,17 +41,17 @@ const Hero = () => {
         <p style={{ fontSize: '1.2rem', color: 'var(--text-dim)', maxWidth: '600px', margin: '10px 0 30px' }}>
           La plataforma todo-en-uno definitiva para gestionar tus juegos, descargar portadas, conseguir logros y revivir las mejores joyas de la historia de los videojuegos.
         </p>
-        
+
         <div style={{ display: 'flex', gap: '20px' }}>
           <a href="https://github.com/DavidFR-2000/ChvstxNexus/releases/latest" style={{ background: 'var(--accent)', color: 'var(--bg-dark)', padding: '15px 30px', borderRadius: '30px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.1rem', boxShadow: '0 4px 15px rgba(88, 166, 255, 0.4)' }}>
-            <Download size={22} /> Descargar v4.0.2
+            <Download size={22} /> Descargar ChvstxNexus
           </a>
           <a href="#features" style={{ background: 'rgba(255, 255, 255, 0.1)', color: 'var(--text-bright)', padding: '15px 30px', borderRadius: '30px', fontWeight: 'bold', display: 'flex', alignItems: 'center', fontSize: '1.1rem', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
             Descubrir Más
           </a>
         </div>
       </div>
-      
+
       {/* App Screenshot */}
       <div className="glass-panel animate-float" style={{ marginTop: '60px', width: '90%', maxWidth: '1000px', borderRadius: '15px', border: '2px solid rgba(88,166,255,0.3)', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#000', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
         <img src={appScreenshot} alt="Chvstx Nexus App UI Screenshot" style={{ width: '100%', height: 'auto', display: 'block' }} />
@@ -73,9 +73,9 @@ const Features = () => {
       <h2 style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: '50px' }}>Por qué elegir <span className="gradient-text">Nexus</span></h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '30px' }}>
         {feats.map((f, i) => (
-          <div key={i} className="glass-panel" style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '15px', transition: 'transform 0.3s' }} 
-               onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
-               onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+          <div key={i} className="glass-panel" style={{ padding: '30px', display: 'flex', flexDirection: 'column', gap: '15px', transition: 'transform 0.3s' }}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
             {f.icon}
             <h3 style={{ margin: '10px 0 0', fontSize: '1.2rem' }}>{f.title}</h3>
             <p style={{ color: 'var(--text-dim)', fontSize: '0.95rem' }}>{f.desc}</p>
@@ -100,12 +100,12 @@ const Changelog = () => {
   return (
     <section id="changelog" style={{ padding: '80px 40px', background: 'rgba(255,255,255,0.02)' }}>
       <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <h2 style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: '10px' }}><Code2 style={{display: 'inline', verticalAlign: 'middle', marginRight: '10px'}}/>Últimas Novedades</h2>
+        <h2 style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: '10px' }}><Code2 style={{ display: 'inline', verticalAlign: 'middle', marginRight: '10px' }} />Últimas Novedades</h2>
         <p style={{ color: 'var(--text-dim)', textAlign: 'center', marginBottom: '40px' }}>El código que alimenta tu nostalgia se actualiza constantemente.</p>
-        
+
         <div className="glass-panel" style={{ padding: '40px' }}>
           {loading ? (
-            <p style={{ textAlign:'center', color:'var(--text-dim)'}}>Refrescando desde GitHub...</p>
+            <p style={{ textAlign: 'center', color: 'var(--text-dim)' }}>Refrescando desde GitHub...</p>
           ) : release && release.name ? (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '20px', marginBottom: '20px' }}>
@@ -115,7 +115,7 @@ const Changelog = () => {
               <div style={{ color: 'var(--text-dim)', whiteSpace: 'pre-wrap', lineHeight: '1.6', fontSize: '0.95rem' }}>
                 {release.body || "Mantenimiento interno y correcciones menores sin log especificado."}
               </div>
-              <a href={release.html_url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: '30px', padding: '10px 20px', background: 'var(--bg-hover)', borderRadius: '6px', border: '1px solid var(--border)'}}>
+              <a href={release.html_url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: '30px', padding: '10px 20px', background: 'var(--bg-hover)', borderRadius: '6px', border: '1px solid var(--border)' }}>
                 Ver Release en GitHub
               </a>
             </>
@@ -142,7 +142,7 @@ const Community = () => {
         {reviews.map((r, i) => (
           <div key={i} className="glass-panel" style={{ padding: '30px', position: 'relative' }}>
             <div style={{ color: '#facc15', marginBottom: '15px', display: 'flex', gap: '5px' }}>
-               {[...Array(r.rating)].map((_,j) => <Star key={j} size={18} fill="currentColor" />)}
+              {[...Array(r.rating)].map((_, j) => <Star key={j} size={18} fill="currentColor" />)}
             </div>
             <p style={{ fontStyle: 'italic', color: 'var(--text-dim)', marginBottom: '20px' }}>"{r.text}"</p>
             <p style={{ fontWeight: 'bold', margin: 0 }}>@{r.author}</p>
@@ -160,11 +160,11 @@ const Donate = () => {
         <Heart size={50} color="var(--accent2)" fill="var(--accent2)" style={{ marginBottom: '20px' }} />
         <h2 style={{ fontSize: '2.5rem', margin: '0 0 20px 0' }}>Apoya el Proyecto</h2>
         <p style={{ color: 'var(--text-dim)', fontSize: '1.1rem', marginBottom: '40px' }}>
-          Chvstx Nexus es y seguirá siendo un software libre para la comunidad retro. 
+          Chvstx Nexus es y seguirá siendo un software libre para la comunidad retro.
           Tu apoyo ayuda a mantener las infraestructuras vivas y asegura horas de nuevo desarrollo.
         </p>
         <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
-           <a href="https://ko-fi.com/chvstx" target="_blank" rel="noreferrer" style={{ display: 'inline-block', padding: '15px 30px', background: '#FF5E5B', color: 'white', borderRadius: '30px', fontSize: '1.1rem', fontWeight: 'bold', textDecoration: 'none', transition: 'transform 0.2s', boxShadow: '0 4px 15px rgba(255, 94, 91, 0.4)' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>☕ Apoyar en Ko-Fi</a>
+          <a href="https://ko-fi.com/chvstx" target="_blank" rel="noreferrer" style={{ display: 'inline-block', padding: '15px 30px', background: '#FF5E5B', color: 'white', borderRadius: '30px', fontSize: '1.1rem', fontWeight: 'bold', textDecoration: 'none', transition: 'transform 0.2s', boxShadow: '0 4px 15px rgba(255, 94, 91, 0.4)' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>☕ Apoyar en Ko-Fi</a>
         </div>
       </div>
     </section>
@@ -191,7 +191,7 @@ const Contact = () => {
           <h2 style={{ fontSize: '2.5rem', margin: '0 0 10px 0' }}>Buzón de Sugerencias</h2>
           <p style={{ color: 'var(--text-dim)' }}>¿Has encontrado un bug o tienes una idea brutal para mejorar Chvstx Nexus? Escríbeme y me llegará directo al correo.</p>
         </div>
-        
+
         {/* Formulario conectado a Formspree */}
         <form action="https://formspree.io/f/xdayagpo" method="POST" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
@@ -222,11 +222,11 @@ const Disclaimer = () => {
         <AlertTriangle size={30} />
         <h2 style={{ fontSize: '1.8rem', margin: 0 }}>Advertencia Legal y Responsabilidad</h2>
       </div>
-      
+
       <div style={{ color: 'var(--text-dim)', fontSize: '0.95rem', lineHeight: '1.6' }}>
         <h3 style={{ color: 'var(--text-bright)', marginTop: '20px', fontSize: '1.2rem' }}>Exención sobre la Inteligencia Artificial</h3>
         <p>Gran parte de la programación lógica, empaquetado e ideación estética de este software ha contado con extensa asistencia de Inteligencia Artificial Avanzada. Al usarse herramientas automatizadas y generativas, la arquitectura del código fuente se abastece "TAL CUAL", eximiendo cualquier garantía total de rendimiento perfecto.</p>
-        
+
         <h3 style={{ color: 'var(--text-bright)', marginTop: '20px', fontSize: '1.2rem' }}>Exención sobre el Hub de ROMS Emuladas</h3>
         <p><strong style={{ color: 'var(--text-bright)' }}>Chvstx Nexus NO almacena, aloja, sube ni fomenta la distribución de ficheros de pago, abandonware, ROMs o juegos licenciados bajo Derechos de Autor en sus propios repositorios.</strong></p>
         <p>El módulo <em>Hub de Descarga</em> interno actúa meramente como un explorador automatizado de atajo, dirigiendo tráfico a servidores ajenos de Internet totalmente independientes (tales como <em>retrostic, Myrient o axekin</em>).</p>
