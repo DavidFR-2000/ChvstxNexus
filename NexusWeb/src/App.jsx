@@ -192,8 +192,8 @@ const Contact = () => {
           <p style={{ color: 'var(--text-dim)' }}>¿Has encontrado un bug o tienes una idea brutal para mejorar Chvstx Nexus? Escríbeme y me llegará directo al correo.</p>
         </div>
         
-        {/* Cambia Formspree_ID por tu ID de Formspree u otro servicio */}
-        <form action="https://formspree.io/f/REEMPLAZAME_POR_TU_ID" method="POST" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Formulario conectado a Formspree */}
+        <form action="https://formspree.io/f/xdayagpo" method="POST" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: 'var(--text-bright)' }}>Tu nombre (opcional)</label>
             <input type="text" name="name" style={{ width: '100%', padding: '15px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border)', color: 'white', fontSize: '1rem', boxSizing: 'border-box' }} placeholder="Ej. RetroGamer99" />
